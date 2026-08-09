@@ -1,0 +1,202 @@
+const Assignment = require('../models/Assignment');
+const Submission = require('../models/Submission');
+const Attendance = require('../models/Attendance');
+const Marks = require('../models/Marks');
+const User = require('../models/User');
+const ROLES = require('../constants/roles');
+
+// @desc    Create a new assignment
+// @route   POST /api/faculty/assignments
+exports.createAssignment = async (req, res) => {
+  const { title, description, fileUrl, branch, sem, deadline } = req.body;
+
+  try {
+    const assignment = await Assignment.create({
+      title,
+      description,
+      fileUrl,
+      branch,
+      sem,
+      deadline,
+      createdBy: req.user._id,
+      facultyName: req.user.name
+    });
+    res.status(201).json(assignment);
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating assignment' });
+  }
+};
+
+// --- STEP 4: Faculty's Own Assignments with Submission Counts ---
+
+// @desc    Get all assignments created by the logged-in faculty
+// @route   GET /api/faculty/assignments
+exports.getMyAssignments = async (req, res) => {
+  try {
+    const assignments = await Assignment.find({ createdBy: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // STEP 5 FIX: Single aggregation instead of N+1 countDocuments calls
+    const assignmentIds = assignments.map((a) => a._id);
+    const counts = await Submission.aggregate([
+      { $match: { assignment: { $in: assignmentIds } } },
+      { $group: { _id: '$assignment', count: { $sum: 1 } } }
+    ]);
+
+    // Build a lookup map: assignmentId -> submissionCount
+    const countMap = {};
+    counts.forEach((c) => { countMap[c._id.toString()] = c.count; });
+
+    const assignmentsWithCounts = assignments.map((a) => ({
+      ...a,
+      submissionCount: countMap[a._id.toString()] || 0
+    }));
+
+    res.json(assignmentsWithCounts);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching your assignments' });
+  }
+};
+
+// @desc    Get all submissions for a specific assignment
+// @route   GET /api/faculty/assignments/:id/submissions
+exports.getAssignmentSubmissions = async (req, res) => {
+  try {
+    // STEP 2 FIX: Verify faculty owns this assignment before showing submissions
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+    if (assignment.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only view submissions for your own assignments' });
+    }
+
+    const submissions = await Submission.find({ assignment: req.params.id });
+    res.json(submissions);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching submissions' });
+  }
+};
+
+// @desc    Submit attendance for a class
+// @route   POST /api/faculty/attendance
+exports.takeAttendance = async (req, res) => {
+  const { subject, date, branch, sem, records } = req.body;
+
+  try {
+    const attendance = await Attendance.create({
+      subject,
+      date,
+      branch,
+      sem,
+      records,
+      faculty: req.user._id
+    });
+    res.status(201).json({ message: 'Attendance recorded successfully', attendance });
+  } catch (error) {
+    res.status(500).json({ message: 'Error recording attendance' });
+  }
+};
+
+// @desc    Upload IA marks for students
+// @route   POST /api/faculty/marks
+exports.uploadMarks = async (req, res) => {
+  const { marksList } = req.body; // Expecting an array of marks objects
+
+  try {
+    // Add faculty ID to each mark entry
+    const formattedMarks = marksList.map(mark => ({
+      ...mark,
+      faculty: req.user._id
+    }));
+
+    await Marks.insertMany(formattedMarks);
+    res.status(201).json({ message: 'Marks uploaded successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading marks. Some entries may already exist.' });
+  }
+};
+
+// @desc    Delete a bad submission (e.g., wrong file uploaded)
+// @route   DELETE /api/faculty/submissions/:id
+exports.deleteSubmission = async (req, res) => {
+  try {
+    const submission = await Submission.findById(req.params.id);
+    
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    // STEP 2 FIX: Verify the submission's assignment belongs to this faculty
+    const assignment = await Assignment.findById(submission.assignment);
+    if (!assignment || assignment.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only delete submissions for your own assignments' });
+    }
+
+    await submission.deleteOne();
+    res.json({ message: 'Submission deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting submission' });
+  }
+};
+
+// @desc    Delete an assignment and all its associated submissions
+// @route   DELETE /api/faculty/assignments/:id
+exports.deleteAssignment = async (req, res) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    // STEP 2 FIX: Verify faculty owns this assignment before deleting
+    if (assignment.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only delete your own assignments' });
+    }
+
+    // Clean up all submissions related to this assignment first
+    await Submission.deleteMany({ assignment: req.params.id });
+    await assignment.deleteOne();
+
+    res.json({ message: 'Assignment and related submissions deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting assignment' });
+  }
+};
+
+// --- STEP 5: Student Roster for Faculty ---
+
+// @desc    Get list of students by branch and semester
+// @route   GET /api/faculty/students
+// @access  Private/Faculty
+exports.getStudentRoster = async (req, res) => {
+  const { branch, sem } = req.query;
+
+  if (!branch || !sem) {
+    return res.status(400).json({ 
+      message: 'Both "branch" and "sem" query parameters are required',
+      statusCode: 400
+    });
+  }
+
+  try {
+    const students = await User.find({
+      role: ROLES.STUDENT,
+      branch: branch,
+      sem: Number(sem)
+    }).select('name usn').sort({ usn: 1 });
+
+    // Return clean response with id, name, usn only
+    const result = students.map((s) => ({
+      id: s._id,
+      name: s.name,
+      usn: s.usn,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching student roster' });
+  }
+};

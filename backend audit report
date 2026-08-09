@@ -1,0 +1,335 @@
+# RYMEC College App Backend — Full Codebase Audit
+
+> **Auditor**: Senior Software Auditor (AI)
+> **Date**: 2026-08-09
+> **Files Audited**: 27 files across 8 directories
+> **Verdict**: **Functional MVP** — all endpoints hit real DB, no fake/mock data, but has notable security and architectural gaps.
+
+---
+
+## 1. PROJECT OVERVIEW
+
+### What it does (based on actual code, not comments)
+A **role-based college management REST API** for RYMEC college with three roles:
+- **Admin** — creates users (students/faculty), promotes semesters, lists/deletes users, broadcasts announcements
+- **Faculty** — creates assignments with file uploads, records attendance, uploads IA marks, views submissions, manages student roster
+- **Student** — views assignments for their branch/sem, submits assignments with file uploads, views own attendance, views own marks
+- **All roles** — login, view/create feed posts
+
+### Tech Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Runtime | Node.js | not pinned |
+| Framework | Express.js | ^4.19.2 |
+| Database | MongoDB Atlas (Mongoose ODM) | ^8.3.2 |
+| Auth | JWT (jsonwebtoken) | ^9.0.2 |
+| Password hashing | bcryptjs | ^2.4.3 |
+| File uploads | Multer + Cloudinary | ^1.4.5-lts.1 / ^1.41.3 |
+| Validation | Joi | ^18.2.3 |
+| Rate limiting | express-rate-limit | ^8.6.2 |
+| Dev tooling | nodemon | ^3.1.0 |
+
+### Folder Structure
+
+```
+college_app_backend/
+├── server.js              ← Entry point: loads env, connects DB, starts Express
+├── package.json
+├── .env                   ← MongoDB URI, JWT secret, Cloudinary creds
+├── scripts/
+│   ├── seedAdmin.js       ← One-time script to create initial admin user
+│   └── diagnose.js        ← Debug script to test env/modules/DB step by step
+└── src/
+    ├── app.js             ← Express app: mounts middleware + all route groups
+    ├── config/
+    │   ├── db.js          ← MongoDB connection with retry logic
+    │   └── storage.js     ← Cloudinary + Multer setup with fail-safe
+    ├── constants/
+    │   └── roles.js       ← { ADMIN, FACULTY, STUDENT } string constants
+    ├── middleware/
+    │   ├── authMiddleware.js       ← JWT token verification (protect)
+    │   ├── roleMiddleware.js       ← Role-based access control (authorize)
+    │   ├── errorMiddleware.js      ← 404 handler + global error handler
+    │   ├── validationMiddleware.js ← Generic Joi validate() factory
+    │   └── validationSchemas.js    ← Joi schemas for login, add-user, attendance, marks
+    ├── models/
+    │   ├── User.js         ← name, usn, email, password (hashed), role, branch, sem
+    │   ├── Assignment.js   ← title, description, fileUrl, branch, sem, deadline, createdBy
+    │   ├── Attendance.js   ← subject, date, branch, sem, faculty, records[]
+    │   ├── Marks.js        ← student, subject, assessmentName, marksObtained, maxMarks
+    │   ├── Submission.js   ← assignment, student, fileUrl, grade, remarks, status
+    │   └── FeedPost.js     ← title, content, author, branchTag, isImportant
+    ├── controllers/
+    │   ├── authController.js
+    │   ├── adminController.js
+    │   ├── facultyController.js
+    │   ├── studentController.js
+    │   └── feedController.js
+    └── routes/
+        ├── authRoutes.js
+        ├── adminRoutes.js
+        ├── facultyRoutes.js
+        ├── studentRoutes.js
+        └── feedRoutes.js
+```
+
+---
+
+## 2. FEATURE INVENTORY
+
+| # | Feature | File(s) | Classification |
+|---|---------|---------|---------------|
+| 1 | Login (JWT) | authController.js, authRoutes.js | ✅ **FULLY IMPLEMENTED** |
+| 2 | Add User (Admin) | adminController.js:L7-36 | ✅ **FULLY IMPLEMENTED** |
+| 3 | Promote Semester (Admin) | adminController.js:L41-54 | ✅ **FULLY IMPLEMENTED** |
+| 4 | List Users (Admin) | adminController.js:L61-86 | ✅ **FULLY IMPLEMENTED** |
+| 5 | Delete User (Admin) | adminController.js:L91-104 | ✅ **FULLY IMPLEMENTED** |
+| 6 | Create Assignment (Faculty) | facultyController.js:L10-28 | ✅ **FULLY IMPLEMENTED** |
+| 7 | Get My Assignments (Faculty) | facultyController.js:L34-52 | ✅ **FULLY IMPLEMENTED** |
+| 8 | Get Submissions (Faculty) | facultyController.js:L56-63 | ✅ **FULLY IMPLEMENTED** |
+| 9 | Record Attendance (Faculty) | facultyController.js:L67-83 | ✅ **FULLY IMPLEMENTED** |
+| 10 | Upload Marks (Faculty) | facultyController.js:L87-102 | ✅ **FULLY IMPLEMENTED** |
+| 11 | Delete Submission (Faculty) | facultyController.js:L106-119 | ✅ **FULLY IMPLEMENTED** |
+| 12 | Delete Assignment (Faculty) | facultyController.js:L123-139 | ✅ **FULLY IMPLEMENTED** |
+| 13 | Student Roster (Faculty) | facultyController.js:L146-174 | ✅ **FULLY IMPLEMENTED** |
+| 14 | Get Assignments (Student) | studentController.js:L9-19 | ✅ **FULLY IMPLEMENTED** |
+| 15 | Submit Assignment (Student) | studentController.js:L23-41 | ✅ **FULLY IMPLEMENTED** |
+| 16 | My Attendance (Student) | studentController.js:L45-89 | ✅ **FULLY IMPLEMENTED** |
+| 17 | My Marks (Student) | studentController.js:L94-101 | ✅ **FULLY IMPLEMENTED** |
+| 18 | Create Feed Post | feedController.js:L7-27 | ✅ **FULLY IMPLEMENTED** |
+| 19 | Get Feed Posts | feedController.js:L32-46 | ✅ **FULLY IMPLEMENTED** |
+| 20 | Delete Feed Post | feedController.js:L51-69 | ✅ **FULLY IMPLEMENTED** |
+| 21 | Admin Broadcast | feedController.js:L72-90 | ✅ **FULLY IMPLEMENTED** |
+| 22 | Joi Validation | validationMiddleware.js, validationSchemas.js | ✅ **FULLY IMPLEMENTED** |
+| 23 | Login Rate Limiting | authRoutes.js:L9-18 | ✅ **FULLY IMPLEMENTED** |
+| 24 | File Upload (Cloudinary) | storage.js | ✅ **FULLY IMPLEMENTED** |
+| 25 | Seed Admin Script | scripts/seedAdmin.js | ✅ **FULLY IMPLEMENTED** |
+| 26 | Diagnose Script | scripts/diagnose.js | ✅ **FULLY IMPLEMENTED** |
+| 27 | Grade/Remark Submission | Submission.js model has `grade`, `remarks`, `status` fields | ⚠️ **PARTIALLY IMPLEMENTED** — schema exists but NO endpoint to grade |
+| 28 | Password Change/Reset | — | ❌ **NOT IMPLEMENTED** |
+| 29 | User Profile / Update | — | ❌ **NOT IMPLEMENTED** |
+| 30 | Pagination on any list endpoint | — | ❌ **NOT IMPLEMENTED** |
+
+---
+
+## 3. DATA SOURCE CHECK
+
+> [!IMPORTANT]
+> **Every single endpoint queries MongoDB Atlas via Mongoose. There is ZERO hardcoded/mock/dummy data anywhere in the source code.** This is genuinely real.
+
+| Controller | Data Source | Verification |
+|-----------|-------------|-------------|
+| authController.js | `User.findOne({ usn })` → real DB | ✅ Real |
+| adminController.js | `User.create()`, `User.updateMany()`, `User.find()`, `User.findById()` | ✅ Real |
+| facultyController.js | `Assignment.create/find`, `Submission.countDocuments/find/deleteMany`, `Attendance.create`, `Marks.insertMany`, `User.find` | ✅ Real |
+| studentController.js | `Assignment.find`, `Submission.create`, `Attendance.aggregate`, `Marks.find` | ✅ Real |
+| feedController.js | `FeedPost.create/find/findById` | ✅ Real |
+
+**Static data found**: Only `scripts/seedAdmin.js` has hardcoded values (`ADMIN01` / `adminpassword123`) — this is intentional for initial seeding.
+
+---
+
+## 4. API ENDPOINT CATALOG
+
+### Auth Routes (`/api/auth`)
+
+| Method | Path | Validation | Rate Limited | Request Body | Response |
+|--------|------|-----------|-------------|-------------|---------|
+| POST | `/login` | ✅ Joi (`loginSchema`) | ✅ 5/15min | `{ usn, password }` | `{ _id, name, usn, role, branch, sem, token }` or `401` |
+
+### Admin Routes (`/api/admin`) — all require `protect` + `authorize(ADMIN)`
+
+| Method | Path | Validation | Request Body | Response |
+|--------|------|-----------|-------------|---------|
+| POST | `/add-user` | ✅ Joi (`addUserSchema`) | `{ name, usn, email, password, role, branch, sem? }` | `201: { message, user: {id, name, usn} }` |
+| POST | `/promote` | ❌ None | `{ branch, currentSem }` | `{ message: "Promoted N students" }` |
+| GET | `/users` | N/A | Query: `?role=&branch=` | `[ { id, name, usn, email, role, branch, sem } ]` |
+| DELETE | `/users/:id` | N/A | — | `{ message }` or `404` |
+
+### Faculty Routes (`/api/faculty`) — all require `protect` + `authorize(FACULTY)`
+
+| Method | Path | Validation | Request Body | Response |
+|--------|------|-----------|-------------|---------|
+| POST | `/assignments` | ❌ None | `{ title, description, branch, sem, deadline }` + file | `201: assignment object` |
+| GET | `/assignments` | N/A | — | `[ { ...assignment, submissionCount } ]` |
+| GET | `/assignments/:id/submissions` | N/A | — | `[ submission objects ]` |
+| DELETE | `/assignments/:id` | N/A | — | `{ message }` (also deletes submissions) |
+| DELETE | `/submissions/:id` | N/A | — | `{ message }` |
+| POST | `/attendance` | ✅ Joi (`attendanceSchema`) | `{ subject, date, branch, sem, records: [{student, status}] }` | `201: { message, attendance }` |
+| POST | `/marks` | ✅ Joi (`marksSchema`) | `{ marksList: [{student, subject, assessmentName, marksObtained, maxMarks?}] }` | `201: { message }` |
+| GET | `/students` | ❌ Manual check | Query: `?branch=&sem=` | `[ { id, name, usn } ]` |
+
+### Student Routes (`/api/student`) — all require `protect` + `authorize(STUDENT)`
+
+| Method | Path | Validation | Request Body | Response |
+|--------|------|-----------|-------------|---------|
+| GET | `/assignments` | N/A | — | `[ assignment objects ]` |
+| POST | `/submit` | ❌ None | `{ assignmentId }` + file | `201: submission object` |
+| GET | `/my-attendance` | N/A | — | `[ { subject, date, records: [filtered] } ]` |
+| GET | `/my-marks` | N/A | — | `[ marks objects ]` |
+
+### Feed Routes (`/api/feed`) — all require `protect`
+
+| Method | Path | Auth | Validation | Request Body | Response |
+|--------|------|------|-----------|-------------|---------|
+| GET | `/` | Any role | N/A | — | `[ feedPost objects ]` (filtered by branch) |
+| POST | `/create` | Any role | ❌ None | `{ title, content, branchTag?, isImportant?, ... }` | `201: feedPost object` |
+| DELETE | `/:id` | Owner or Admin | N/A | — | `{ message }` |
+| POST | `/broadcast` | Admin only | ❌ None | `{ title, content, isImportant? }` | `201: feedPost object` |
+
+### Root
+
+| Method | Path | Response |
+|--------|------|---------|
+| GET | `/` | `"College App API is Active."` |
+
+**Total: 19 API endpoints. All connected to real MongoDB. Zero fake responses.**
+
+---
+
+## 5. AUTH & SECURITY STATUS
+
+### What works ✅
+- **JWT login** — real `bcrypt.compare()` against hashed passwords in DB
+- **Token verification** — `protect` middleware decodes JWT, fetches user from DB with `-password`
+- **Role-based access** — `authorize()` middleware checks `req.user.role` against allowed roles
+- **Rate limiting** — login endpoint limited to 5 attempts per 15 min per IP
+- **Password hashing** — `bcrypt.genSalt(10)` in User model `pre('save')` hook
+- **Duplicate prevention** — unique index on `Submission` (student+assignment) and `Marks` (student+subject+assessment)
+
+### Security Issues Found ⚠️
+
+| Issue | Severity | Location | Details |
+|-------|----------|----------|---------|
+| **No registration endpoint** | Low | — | Only admins can create users. This is by design but means no self-service. |
+| **No password change** | Medium | — | Users cannot change their own password. Only admin can delete and re-create. |
+| **No token expiry refresh** | Low | authController.js:L5 | Token expires in 30d with no refresh mechanism |
+| **No ownership check on faculty routes** | **High** | facultyController.js | Any faculty can delete ANY assignment/submission — not just their own. `deleteAssignment` at L123 does `Assignment.findById(req.params.id)` but never checks `assignment.createdBy === req.user._id`. Same for `deleteSubmission`. |
+| **No ownership check on getAssignmentSubmissions** | Medium | facultyController.js:L56 | Any faculty can view submissions for any assignment, not just their own. |
+| **Promote endpoint has no validation** | Medium | adminRoutes.js:L16 | `POST /promote` accepts `{ branch, currentSem }` with no Joi validation. Could be called with missing fields. |
+| **Feed create has no validation** | Low | feedRoutes.js:L12 | `POST /create` and `POST /broadcast` accept body with no Joi schema. Empty title/content possible (Mongoose `required` will catch it, but error message is generic 500). |
+| **Assignment create has no validation** | Medium | facultyRoutes.js:L29 | `POST /assignments` has no Joi schema. Missing required fields will cause a Mongoose error → generic 500 response. |
+| **Student submit has no validation** | Medium | studentRoutes.js:L25 | `POST /submit` has no Joi validation on `assignmentId`. |
+| **Hardcoded admin credentials in seed script** | Low | scripts/seedAdmin.js:L21 | `adminpassword123` is in plain text in source. Should be changed after seeding. |
+| **JWT secret is weak** | Medium | .env:L3 | `rymec_2026_top_secret_key` is a guessable secret. |
+| **.env is not gitignored** | **High** | — | No `.gitignore` file exists. Real Cloudinary keys + DB password could be committed. |
+
+---
+
+## 6. DATABASE STATUS
+
+### Database: MongoDB Atlas
+- **Connection**: Direct `mongodb://` connection string (non-SRV, bypasses DNS issues)
+- **Cluster**: `ac-cr7afze-shard-00-00.8nvpter.mongodb.net` (3-shard replica set)
+- **Database name**: `college`
+- **Connection logic**: Retry 5x with 3s delay, no `process.exit(1)` on failure
+
+### Models (6 collections)
+
+| Model | Schema Complete? | Indexes | Relations | Issues |
+|-------|-----------------|---------|-----------|--------|
+| **User** | ✅ Yes | `usn` unique, `email` unique | — | No index on `role`+`branch` (used by admin/faculty queries) |
+| **Assignment** | ✅ Yes | None added | `createdBy` → User | No index on `branch`+`sem` (used by student queries) |
+| **Attendance** | ✅ Yes | None added | `faculty` → User, `records.student` → User | No index on `records.student` (used by aggregation) |
+| **Marks** | ✅ Yes | `student`+`subject`+`assessmentName` unique compound | `student` → User, `faculty` → User | ✅ Well-designed |
+| **Submission** | ✅ Yes | `assignment`+`student` unique compound | `assignment` → Assignment, `student` → User | `grade`/`remarks`/`status` fields exist but no grading endpoint |
+| **FeedPost** | ✅ Yes | None added | `author` → User | No index on `branchTag` (used by feed query) |
+
+### Query Quality
+
+| Query | Location | Quality | Notes |
+|-------|----------|---------|-------|
+| Student attendance | studentController.js:L66 | ✅ **Good** | Uses `$match` + `$project` + `$filter` aggregation — correctly replaces broken `$` operator |
+| Faculty own assignments | facultyController.js:L36-46 | ⚠️ **N+1 query** | Runs `Submission.countDocuments()` inside a `.map()` loop — one extra DB call per assignment |
+| Admin get users | adminController.js:L67 | ✅ **Good** | Uses `.select()` to exclude password hash |
+| Feed posts | feedController.js:L35-40 | ✅ **Good** | `$or` filter for branch-specific + "All" posts |
+| Delete assignment | facultyController.js:L132 | ✅ **Good** | Cascades delete to `Submission.deleteMany()` |
+
+---
+
+## 7. GAPS & INCONSISTENCIES
+
+### Missing Features
+1. **No grading endpoint** — `Submission` model has `grade`, `remarks`, `status` fields but no PUT/PATCH endpoint to update them
+2. **No password change** — no endpoint for users to change/reset their password
+3. **No user profile update** — no endpoint to update name, email, etc.
+4. **No pagination** — all list endpoints return ALL records (will break at scale)
+5. **No `.gitignore`** — `.env` with real credentials could be committed to version control
+6. **No logout/token invalidation** — JWT tokens can't be revoked
+
+### Inconsistencies Found
+1. **Validation coverage is uneven**: login, add-user, attendance, marks have Joi validation. But create-assignment, submit-assignment, create-post, broadcast, and promote have **none**.
+2. **Error response format inconsistent**: Some endpoints return `{ message }`, others return `{ message, statusCode }`. Validation errors include `statusCode: 400`, but controller errors don't.
+3. **No `.populate()` used anywhere**: Relations exist in schemas (`ref: 'User'`) but no query ever calls `.populate()`. Submissions return raw ObjectId for `assignment` and `student` instead of the actual assignment title or student name (partially compensated by denormalized `studentName`/`studentUsn` fields).
+4. **Denormalized data can go stale**: `FeedPost.authorName`, `Submission.studentName/studentUsn`, `Assignment.facultyName` are cached strings. If a user's name changes, these won't update.
+5. **Faculty delete isn't scoped**: Faculty A can delete Faculty B's assignments/submissions — no ownership verification.
+6. **`diagnose.js` references relative paths from `scripts/` folder**: Works only when run as `node scripts/diagnose.js` from project root. `seedAdmin.js` has the same pattern — both work but are fragile.
+
+### Unused/Dead Code
+- **None found** — all files are actively imported and used. No commented-out code blocks, no unused imports. Clean codebase.
+
+---
+
+## 8. FINAL SUMMARY TABLE
+
+| Feature/Module | Status | Real Data? | Notes |
+|---|---|---|---|
+| **Login (JWT auth)** | ✅ Fully Implemented | ✅ Real DB | Rate-limited, Joi-validated |
+| **JWT Token Middleware** | ✅ Fully Implemented | ✅ Real DB | Fetches user per request, excludes password |
+| **Role-Based Access** | ✅ Fully Implemented | ✅ Real DB | 3 roles: admin, faculty, student |
+| **Admin: Add User** | ✅ Fully Implemented | ✅ Real DB | Joi-validated, duplicate check |
+| **Admin: Promote Semester** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No Joi validation on input |
+| **Admin: List Users** | ✅ Fully Implemented | ✅ Real DB | Supports role/branch query filters |
+| **Admin: Delete User** | ✅ Fully Implemented | ✅ Real DB | No cascade delete of user's data |
+| **Faculty: Create Assignment** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No Joi validation; supports file upload |
+| **Faculty: My Assignments** | ✅ Fully Implemented | ✅ Real DB | ⚠️ N+1 query for submission counts |
+| **Faculty: View Submissions** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No ownership check |
+| **Faculty: Delete Assignment** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No ownership check; cascades submissions |
+| **Faculty: Delete Submission** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No ownership check |
+| **Faculty: Record Attendance** | ✅ Fully Implemented | ✅ Real DB | Joi-validated |
+| **Faculty: Upload Marks** | ✅ Fully Implemented | ✅ Real DB | Joi-validated, bulk insert |
+| **Faculty: Student Roster** | ✅ Fully Implemented | ✅ Real DB | Manual branch+sem validation |
+| **Student: View Assignments** | ✅ Fully Implemented | ✅ Real DB | Filtered by student's branch+sem |
+| **Student: Submit Assignment** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No Joi validation; dedup via unique index |
+| **Student: My Attendance** | ✅ Fully Implemented | ✅ Real DB | Uses correct $filter aggregation |
+| **Student: My Marks** | ✅ Fully Implemented | ✅ Real DB | Simple query |
+| **Feed: Get Posts** | ✅ Fully Implemented | ✅ Real DB | Branch-filtered + "All" |
+| **Feed: Create Post** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No Joi validation |
+| **Feed: Delete Post** | ✅ Fully Implemented | ✅ Real DB | Owner or admin can delete |
+| **Feed: Admin Broadcast** | ✅ Fully Implemented | ✅ Real DB | ⚠️ No Joi validation |
+| **Cloudinary File Upload** | ✅ Fully Implemented | ✅ Real service | Fail-safe: returns 503 if unconfigured |
+| **Joi Validation** | ⚠️ Partial | N/A | Only on 4 of 10 write endpoints |
+| **Rate Limiting** | ✅ Fully Implemented | N/A | Login only (5 req/15 min) |
+| **Seed Admin Script** | ✅ Fully Implemented | ✅ Real DB | One-time use |
+| **Diagnose Script** | ✅ Fully Implemented | ✅ Real DB | Tests env + modules + DB |
+| **Grade Submissions** | ⚠️ Schema only | — | Model has fields, no endpoint to use them |
+| **Password Change** | ❌ Not Implemented | — | No endpoint exists |
+| **User Profile Update** | ❌ Not Implemented | — | No endpoint exists |
+| **Pagination** | ❌ Not Implemented | — | All lists return full result sets |
+| **.gitignore** | ❌ Missing | — | Credentials at risk of being committed |
+
+---
+
+## 9. OVERALL VERDICT
+
+> [!IMPORTANT]
+> **This is a legitimate, functional MVP.** All 19 API endpoints execute real MongoDB queries — there is absolutely zero mock/fake/hardcoded data. The code is clean, well-organized, and follows consistent patterns.
+
+### Strengths
+- ✅ Clean, consistent project structure
+- ✅ Every endpoint hits real MongoDB — no stubs
+- ✅ Proper password hashing (bcrypt, salt 10)
+- ✅ JWT auth with role-based middleware
+- ✅ Cloudinary integration with graceful degradation
+- ✅ Smart aggregation fix for attendance query
+- ✅ Unique compound indexes preventing duplicate submissions/marks
+- ✅ No dead code, no TODOs, no FIXMEs
+
+### Critical Gaps (fix before production)
+1. 🔴 **No `.gitignore`** — real DB password + Cloudinary keys in `.env` could be pushed to Git
+2. 🔴 **No ownership checks on faculty delete** — any faculty can delete any faculty's assignments
+3. 🟡 **Joi validation missing on 6/10 write endpoints**
+4. 🟡 **No pagination** — will degrade at scale
+5. 🟡 **No grading endpoint** — schema supports it but no route exists
+6. 🟡 **Weak JWT secret** — easily guessable
