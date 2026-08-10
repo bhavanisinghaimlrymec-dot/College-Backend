@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['admin', 'faculty', 'student'], required: true },
   branch: { type: String, required: true },
   sem: { type: Number }, // Only relevant for students
+  isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
 // Hash password automatically before saving to DB

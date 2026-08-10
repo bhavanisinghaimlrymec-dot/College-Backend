@@ -11,8 +11,21 @@ exports.getAvailableAssignments = async (req, res) => {
     const assignments = await Assignment.find({ 
       branch: req.user.branch, 
       sem: req.user.sem 
-    }).sort({ deadline: 1 });
-    res.json(assignments);
+    }).sort({ deadline: 1 }).lean();
+    const submissions = await Submission.find({
+      student: req.user._id,
+      assignment: { $in: assignments.map((assignment) => assignment._id) },
+    }).select('assignment fileUrl submittedAt');
+    const byAssignment = new Map(submissions.map((submission) => [submission.assignment.toString(), submission]));
+    res.json(assignments.map((assignment) => {
+      const submission = byAssignment.get(assignment._id.toString());
+      return {
+        ...assignment,
+        isSubmitted: Boolean(submission),
+        submissionUrl: submission?.fileUrl,
+        submittedAt: submission?.submittedAt,
+      };
+    }));
   } catch (error) {
     res.status(500).json({ message: 'Error fetching assignments' });
   }

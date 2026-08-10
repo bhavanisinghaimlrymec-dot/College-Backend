@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const ROLES = require('../constants/roles');
+const Attendance = require('../models/Attendance');
+const FeedPost = require('../models/FeedPost');
 
 // @desc    Register a new user (Student or Faculty)
 // @route   POST /api/admin/add-user
@@ -21,7 +23,7 @@ exports.addUser = async (req, res) => {
       password,
       role,
       branch,
-      sem: role === ROLES.STUDENT ? sem : undefined,
+      sem,
     });
 
     if (user) {
@@ -65,7 +67,7 @@ exports.getUsers = async (req, res) => {
     if (req.query.branch) filter.branch = req.query.branch;
 
     const users = await User.find(filter)
-      .select('name usn email role branch sem')
+      .select('name usn email role branch sem isActive')
       .sort({ createdAt: -1 });
 
     // Map _id to id for cleaner API response
@@ -77,6 +79,7 @@ exports.getUsers = async (req, res) => {
       role: u.role,
       branch: u.branch,
       sem: u.sem,
+      isActive: u.isActive,
     }));
 
     res.json(result);
@@ -100,5 +103,42 @@ exports.deleteUser = async (req, res) => {
     res.json({ message: `User ${user.name} (${user.usn}) deleted successfully` });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting user' });
+  }
+};
+
+// @desc    Suspend or reactivate a user
+// @route   PATCH /api/admin/users/:id/status
+exports.updateUserStatus = async (req, res) => {
+  if (typeof req.body.isActive !== 'boolean') {
+    return res.status(400).json({ message: 'isActive must be a boolean' });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isActive: req.body.isActive },
+      { new: true }
+    ).select('name usn email role branch sem isActive');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating user status' });
+  }
+};
+
+// @desc    Campus summary for the admin dashboard
+// @route   GET /api/admin/overview
+exports.getOverview = async (req, res) => {
+  try {
+    const [students, faculty, activeUsers, attendanceSessions, posts] = await Promise.all([
+      User.countDocuments({ role: ROLES.STUDENT }),
+      User.countDocuments({ role: ROLES.FACULTY }),
+      User.countDocuments({ isActive: true }),
+      Attendance.countDocuments(),
+      FeedPost.countDocuments(),
+    ]);
+    res.json({ students, faculty, activeUsers, attendanceSessions, posts });
+  } catch (error) {
+    res.status(500).json({ message: 'Error loading overview' });
   }
 };

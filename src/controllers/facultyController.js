@@ -8,12 +8,13 @@ const ROLES = require('../constants/roles');
 // @desc    Create a new assignment
 // @route   POST /api/faculty/assignments
 exports.createAssignment = async (req, res) => {
-  const { title, description, fileUrl, branch, sem, deadline } = req.body;
+  const { title, description, subject, fileUrl, branch, sem, deadline } = req.body;
 
   try {
     const assignment = await Assignment.create({
       title,
       description,
+      subject,
       fileUrl,
       branch,
       sem,

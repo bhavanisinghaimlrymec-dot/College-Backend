@@ -9,6 +9,9 @@ exports.login = async (req, res) => {
   const { usn, password } = req.body;
   try {
     const user = await User.findOne({ usn });
+    if (user && user.isActive === false) {
+      return res.status(403).json({ message: 'This account has been suspended. Please contact the administrator.' });
+    }
     if (user && (await user.matchPassword(password))) {
       res.json({
         _id: user._id,
@@ -17,6 +20,7 @@ exports.login = async (req, res) => {
         role: user.role,
         branch: user.branch,
         sem: user.sem,
+        isActive: user.isActive,
         token: generateToken(user._id),
       });
     } else {

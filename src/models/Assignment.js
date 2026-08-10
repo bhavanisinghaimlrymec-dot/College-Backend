@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const assignmentSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String },
+  subject: { type: String, required: true },
   fileUrl: { type: String }, // URL to the PDF/Doc on Cloudinary/S3
   branch: { type: String, required: true }, // e.g., 'CSE'
   sem: { type: Number, required: true },    // e.g., 5

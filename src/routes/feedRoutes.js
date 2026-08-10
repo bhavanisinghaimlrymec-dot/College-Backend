@@ -11,7 +11,7 @@ const { createPostSchema, broadcastSchema } = require('../middleware/validationS
 router.use(protect);
 
 router.get('/', getPosts);
-router.post('/create', validate(createPostSchema), createPost);
+router.post('/create', authorize(ROLES.ADMIN, ROLES.FACULTY), validate(createPostSchema), createPost);
 router.delete('/:id', deletePost);
 
 router.post('/broadcast', authorize(ROLES.ADMIN), validate(broadcastSchema), createBroadcast);

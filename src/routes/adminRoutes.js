@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addUser, promoteSemester, getUsers, deleteUser } = require('../controllers/adminController');
+const { addUser, promoteSemester, getUsers, deleteUser, updateUserStatus, getOverview } = require('../controllers/adminController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 const ROLES = require('../constants/roles');
@@ -16,6 +16,8 @@ router.post('/promote', validate(promoteSchema), promoteSemester);
 
 // STEP 3: Admin user management endpoints
 router.get('/users', getUsers);
+router.patch('/users/:id/status', updateUserStatus);
 router.delete('/users/:id', deleteUser);
+router.get('/overview', getOverview);
 
 module.exports = router;

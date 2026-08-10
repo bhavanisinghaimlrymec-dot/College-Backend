@@ -110,6 +110,9 @@ const createAssignmentSchema = Joi.object({
   description: Joi.string().required().messages({
     'any.required': 'Assignment description is required',
   }),
+  subject: Joi.string().required().messages({
+    'any.required': 'Subject is required',
+  }),
   branch: Joi.string().required().messages({
     'any.required': 'Branch is required',
   }),
