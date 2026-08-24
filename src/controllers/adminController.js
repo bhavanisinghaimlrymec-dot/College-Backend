@@ -11,16 +11,24 @@ exports.addUser = async (req, res) => {
   const usn = (usnInput || employeeId || '').trim();
 
   try {
-    const userExists = await User.findOne({ usn });
+    if (!usn) {
+      return res.status(400).json({ message: 'USN or Employee ID is required' });
+    }
+
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const userExists = await User.findOne({ $or: [{ usn }, { email: cleanEmail }] });
 
     if (userExists) {
-      return res.status(400).json({ message: 'User with this ID already exists' });
+      if (userExists.usn === usn) {
+        return res.status(400).json({ message: 'User with this USN or Employee ID already exists' });
+      }
+      return res.status(400).json({ message: 'User with this Email already exists' });
     }
 
     const user = await User.create({
       name,
       usn,
-      email,
+      email: cleanEmail,
       password,
       role,
       branch,
@@ -34,7 +42,11 @@ exports.addUser = async (req, res) => {
       });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server error while adding user' });
+    console.error('Error in addUser:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'User with this USN/Employee ID or Email already exists' });
+    }
+    res.status(500).json({ message: error.message || 'Server error while adding user' });
   }
 };
 
