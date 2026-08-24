@@ -5,6 +5,8 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
+// @desc    Login user
+// @route   POST /api/auth/login
 exports.login = async (req, res) => {
   const { usn, password } = req.body;
   try {
@@ -17,6 +19,7 @@ exports.login = async (req, res) => {
         _id: user._id,
         name: user.name,
         usn: user.usn,
+        email: user.email,
         role: user.role,
         branch: user.branch,
         sem: user.sem,
@@ -28,5 +31,30 @@ exports.login = async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get logged-in user's profile
+// @route   GET /api/auth/profile
+// @access  Private (requires Bearer token)
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({
+      _id: user._id,
+      name: user.name,
+      usn: user.usn,
+      email: user.email,
+      role: user.role,
+      branch: user.branch,
+      sem: user.sem,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching profile' });
   }
 };

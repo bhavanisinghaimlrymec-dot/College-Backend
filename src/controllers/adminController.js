@@ -7,7 +7,8 @@ const FeedPost = require('../models/FeedPost');
 // @route   POST /api/admin/add-user
 // @access  Private/Admin
 exports.addUser = async (req, res) => {
-  const { name, usn, email, password, role, branch, sem } = req.body;
+  const { name, usn: usnInput, employeeId, email, password, role, branch, sem } = req.body;
+  const usn = (usnInput || employeeId || '').trim();
 
   try {
     const userExists = await User.findOne({ usn });

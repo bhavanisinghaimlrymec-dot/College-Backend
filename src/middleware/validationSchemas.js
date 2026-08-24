@@ -20,9 +20,8 @@ const addUserSchema = Joi.object({
   name: Joi.string().required().messages({
     'any.required': 'Name is required',
   }),
-  usn: Joi.string().required().messages({
-    'any.required': 'USN is required',
-  }),
+  usn: Joi.string().optional(),
+  employeeId: Joi.string().optional(),
   email: Joi.string().email().required().messages({
     'any.required': 'Email is required',
     'string.email': 'Email must be a valid email address',
@@ -46,8 +45,10 @@ const addUserSchema = Joi.object({
       'number.min': 'Semester must be between 1 and 8',
       'number.max': 'Semester must be between 1 and 8',
     }),
-    otherwise: Joi.number().optional(),
+    otherwise: Joi.number().integer().min(1).max(8).optional().allow(null),
   }),
+}).or('usn', 'employeeId').messages({
+  'object.missing': 'USN or Employee ID is required',
 });
 
 // POST /api/faculty/attendance

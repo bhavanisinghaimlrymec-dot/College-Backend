@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
-const { login } = require('../controllers/authController');
+const { login, getProfile } = require('../controllers/authController');
+const { protect } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validationMiddleware');
 const { loginSchema } = require('../middleware/validationSchemas');
 
@@ -20,5 +21,8 @@ const loginLimiter = rateLimit({
 // STEP 6: validate(loginSchema) checks usn + password are present strings
 // STEP 7: loginLimiter blocks after 5 failed attempts per 15 min per IP
 router.post('/login', loginLimiter, validate(loginSchema), login);
+
+// GET /api/auth/profile — requires valid JWT token
+router.get('/profile', protect, getProfile);
 
 module.exports = router;
