@@ -149,6 +149,7 @@ const createPostSchema = Joi.object({
     'string.empty': 'Post content cannot be empty',
   }),
   branchTag: Joi.string().optional(),
+  audience: Joi.string().valid('everyone', 'students', 'faculty').optional(),
   isImportant: Joi.boolean().optional(),
   hasAttachment: Joi.boolean().optional(),
   attachmentUrl: Joi.string().uri().optional(),
@@ -164,6 +165,8 @@ const broadcastSchema = Joi.object({
     'any.required': 'Broadcast content is required',
     'string.empty': 'Broadcast content cannot be empty',
   }),
+  audience: Joi.string().valid('everyone', 'students', 'faculty').optional(),
+  branchTag: Joi.string().optional(),
   isImportant: Joi.boolean().optional(),
 });
 

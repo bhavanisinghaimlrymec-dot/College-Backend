@@ -6,7 +6,7 @@ const { notify } = require('../utils/notify');
 // @route   POST /api/feed/create
 // @access  Private
 exports.createPost = async (req, res) => {
-  const { title, content, branchTag, isImportant, hasAttachment, attachmentUrl } = req.body;
+  const { title, content, branchTag, audience, isImportant, hasAttachment, attachmentUrl } = req.body;
 
   try {
     const post = await FeedPost.create({
@@ -16,6 +16,7 @@ exports.createPost = async (req, res) => {
       authorName: req.user.name,
       authorRole: req.user.role,
       branchTag: branchTag || 'All',
+      audience: ['everyone', 'students', 'faculty'].includes(audience) ? audience : 'everyone',
       isImportant,
       hasAttachment,
       attachmentUrl
@@ -24,7 +25,7 @@ exports.createPost = async (req, res) => {
     res.status(201).json(post);
 
     notify({
-      toRole: 'all',
+      toRole: post.audience === 'students' ? 'student' : post.audience === 'faculty' ? 'faculty' : 'all',
       branch: post.branchTag || 'All',
       type: 'post',
       title: `New post: ${post.title}`,
@@ -36,17 +37,28 @@ exports.createPost = async (req, res) => {
   }
 };
 
-// @desc    Get all posts (filtered by branch)
+// Audience filter: admins/principals see everything; students see
+// everyone+students; faculty/hod see everyone+faculty — always combined
+// with the branch scope.
+const audienceFilter = (user) => {
+  if ([ROLES.ADMIN, ROLES.PRINCIPAL].includes(user.role)) return {};
+  if (user.role === ROLES.STUDENT) return { audience: { $in: ['everyone', 'students'] } };
+  return { audience: { $in: ['everyone', 'faculty'] } };
+};
+
+// @desc    Get all posts (filtered by branch + audience)
 // @route   GET /api/feed
 // @access  Private
 exports.getPosts = async (req, res) => {
   try {
-    // Show posts for their specific branch OR posts tagged for 'All'
+    // Show posts for their specific branch OR posts tagged for 'All',
+    // restricted to the audiences the role may see.
     const filter = {
       $or: [
         { branchTag: 'All' },
         { branchTag: req.user.branch }
-      ]
+      ],
+      ...audienceFilter(req.user),
     };
 
     // Optional pagination: only when ?page or ?limit is passed, so existing
@@ -104,24 +116,29 @@ exports.deletePost = async (req, res) => {
 // @desc    Create a Global Broadcast (Admin Only)
 // @route   POST /api/feed/broadcast
 exports.createBroadcast = async (req, res) => {
-  const { title, content, isImportant } = req.body;
+  const { title, content, isImportant, audience, branchTag } = req.body;
 
   try {
+    const targetAudience = ['everyone', 'students', 'faculty'].includes(audience)
+      ? audience
+      : 'everyone';
+    const targetBranch = (branchTag || 'All').trim() || 'All';
     const broadcast = await FeedPost.create({
       title,
       content,
       author: req.user._id,
       authorName: "SYSTEM ADMIN",
       authorRole: "admin",
-      branchTag: "All", // Forces it to be visible to everyone
+      branchTag: targetBranch,
+      audience: targetAudience,
       isImportant: true, // Broadcasts are usually important
     });
 
     res.status(201).json(broadcast);
 
     notify({
-      toRole: 'all',
-      branch: 'All',
+      toRole: targetAudience === 'students' ? 'student' : targetAudience === 'faculty' ? 'faculty' : 'all',
+      branch: targetBranch,
       type: 'broadcast',
       title: `Announcement: ${broadcast.title}`,
       body: broadcast.content,

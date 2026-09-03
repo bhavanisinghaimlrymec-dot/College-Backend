@@ -414,6 +414,31 @@ async function runTests() {
       log('POST /api/feed/broadcast (admin)', ok, `Status ${r.status} | ${JSON.stringify(r.body).substring(0, 120)}`);
     }
 
+    // 7e2. Targeted broadcast (students of CSE only)
+    let targetedId = null;
+    {
+      const r = await request('POST', '/api/feed/broadcast', {
+        title: 'CSE Students Only',
+        content: 'Targeted test broadcast',
+        audience: 'students',
+        branchTag: 'CSE',
+      }, state.adminToken);
+      const ok = r.status === 201 && r.body.audience === 'students' && r.body.branchTag === 'CSE';
+      if (ok) targetedId = r.body._id;
+      log('POST /api/feed/broadcast (targeted)', ok, `Status ${r.status} | audience=${r.body.audience} branch=${r.body.branchTag}`);
+    }
+
+    // 7e3. Student sees the targeted post; faculty does not
+    if (targetedId && state.studentToken && state.facultyToken) {
+      const s = await request('GET', '/api/feed', null, state.studentToken);
+      const f = await request('GET', '/api/feed', null, state.facultyToken);
+      const sSeen = Array.isArray(s.body) && s.body.some((p) => p._id === targetedId);
+      const fSeen = Array.isArray(f.body) && f.body.some((p) => p._id === targetedId);
+      log('GET /api/feed (student sees targeted)', s.status === 200 && sSeen, `Status ${s.status} | seen=${sSeen}`);
+      log('GET /api/feed (faculty hidden from students-only)', f.status === 200 && !fSeen, `Status ${f.status} | seen=${fSeen}`);
+      await request('DELETE', `/api/feed/${targetedId}`, null, state.adminToken);
+    }
+
     // 7f. Broadcast as student (should be denied)
     if (state.studentToken) {
       const r = await request('POST', '/api/feed/broadcast', {
