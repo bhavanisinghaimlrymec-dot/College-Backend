@@ -5,7 +5,6 @@ const FeedPost = require('../models/FeedPost');
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Marks = require('../models/Marks');
-const TimetableSlot = require('../models/TimetableSlot');
 
 // @desc    Register a new user (Student or Faculty)
 // @route   POST /api/admin/add-user
@@ -180,7 +179,6 @@ exports.deleteUser = async (req, res) => {
         Assignment.deleteMany({ createdBy: userId }),
         Attendance.deleteMany({ faculty: userId }),
         Marks.deleteMany({ faculty: userId }),
-        TimetableSlot.deleteMany({ faculty: userId }),
       ]);
     }
 

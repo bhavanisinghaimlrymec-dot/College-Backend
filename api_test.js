@@ -465,7 +465,7 @@ async function runTests() {
     }
   }
 
-  // ──────────────────── 9. NEW ENDPOINTS (change-password, timetable, attendance history) ──
+  // ──────────────────── 9. NEW ENDPOINTS (change-password, attendance history) ──
   console.log('\n── 9. NEW ENDPOINTS ──');
 
   if (!state.facultyToken) {
@@ -505,32 +505,6 @@ async function runTests() {
           currentPassword: 'newpass123',
           newPassword: 'password123',
         }, state.facultyToken);
-      }
-    }
-
-    // 9d. Timetable CRUD + overlap guard
-    {
-      const slot = { day: 'Monday', startTime: '09:00', endTime: '10:00', subject: 'Test Subject', branch: 'CSE', room: 'Room 101' };
-      const c = await request('POST', '/api/timetable', slot, state.facultyToken);
-      const slotId = c.body && (c.body.id || c.body._id);
-      log('POST /api/timetable', c.status === 201 && slotId, `Status ${c.status} | ID: ${slotId || 'N/A'}`);
-
-      const g = await request('GET', '/api/timetable', null, state.facultyToken);
-      log('GET /api/timetable', g.status === 200 && Array.isArray(g.body), `Status ${g.status} | Count: ${Array.isArray(g.body) ? g.body.length : 'N/A'}`);
-
-      const o = await request('POST', '/api/timetable', { ...slot, subject: 'Overlap' }, state.facultyToken);
-      log('POST /api/timetable (overlap → 409)', o.status === 409, `Status ${o.status}`);
-
-      const v = await request('POST', '/api/timetable', { ...slot, day: 'Tuesday' }, state.facultyToken);
-      log('POST /api/timetable (invalid → 400)', v.status === 400, `Status ${v.status}`);
-
-      if (slotId) {
-        const u = await request('PUT', `/api/timetable/${slotId}`, { room: 'Room 202' }, state.facultyToken);
-        log('PUT /api/timetable/:id', u.status === 200, `Status ${u.status}`);
-        const d = await request('DELETE', `/api/timetable/${slotId}`, null, state.facultyToken);
-        log('DELETE /api/timetable/:id', d.status === 200, `Status ${d.status}`);
-      } else {
-        logSkip('PUT/DELETE /api/timetable/:id', 'No slot created');
       }
     }
 

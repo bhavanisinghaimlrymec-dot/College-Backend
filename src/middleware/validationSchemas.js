@@ -192,31 +192,6 @@ const changePasswordSchema = Joi.object({
   }),
 });
 
-// Timetable slot payload (POST /api/timetable, PUT /api/timetable/:id)
-const timetableSchema = Joi.object({
-  day: Joi.string()
-    .valid('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
-    .required()
-    .messages({
-      'any.required': 'Day is required',
-      'any.only': 'Day must be a valid weekday name (e.g. Monday)',
-    }),
-  startTime: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/).required().messages({
-    'any.required': 'Start time is required',
-    'string.pattern.base': 'Start time must be in HH:mm 24-hour format',
-  }),
-  endTime: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/).required().messages({
-    'any.required': 'End time is required',
-    'string.pattern.base': 'End time must be in HH:mm 24-hour format',
-  }),
-  subject: Joi.string().required().messages({
-    'any.required': 'Subject is required',
-    'string.empty': 'Subject cannot be empty',
-  }),
-  branch: Joi.string().allow('').optional(),
-  room: Joi.string().allow('').optional(),
-});
-
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -228,5 +203,4 @@ module.exports = {
   broadcastSchema,
   promoteSchema,
   changePasswordSchema,
-  timetableSchema,
 };
