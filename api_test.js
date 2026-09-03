@@ -836,6 +836,88 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9g. GRIEVANCES + PERFORMANCE + GRADING ──
+  console.log('\n── 9g. GRIEVANCES + PERFORMANCE + GRADING ──');
+
+  if (!state.adminToken || !state.studentToken || !state.facultyToken) {
+    logSkip('All 9g tests', 'Need admin + student + faculty tokens');
+  } else {
+    // 9g-i. Student raises a grievance
+    let grievanceId = null;
+    {
+      const r = await request('POST', '/api/grievances', {
+        category: 'Academic', subject: 'Library hours', description: 'Please extend library hours during exams.',
+      }, state.studentToken);
+      const ok = r.status === 201 && r.body.id;
+      if (ok) grievanceId = r.body.id;
+      log('POST /api/grievances (student)', ok, `Status ${r.status}`);
+    }
+
+    // 9g-ii. Invalid grievance → 400
+    {
+      const r = await request('POST', '/api/grievances', { subject: 'x' }, state.studentToken);
+      log('POST /api/grievances (invalid → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9g-iii. Admin lists + resolves
+    {
+      const l = await request('GET', '/api/grievances', null, state.adminToken);
+      const okList = l.status === 200 && Array.isArray(l.body);
+      log('GET /api/grievances (admin)', okList, `Status ${l.status}`);
+      if (grievanceId) {
+        const p = await request('PATCH', `/api/grievances/${grievanceId}`, {
+          status: 'resolved', reply: 'Extended till 8pm during exams.',
+        }, state.adminToken);
+        log('PATCH /api/grievances/:id (resolve)', p.status === 200 && p.body.status === 'resolved', `Status ${p.status}`);
+      }
+    }
+
+    // 9g-iv. Student sees own ticket with reply
+    {
+      const r = await request('GET', '/api/grievances', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body);
+      log('GET /api/grievances (student)', ok, `Status ${r.status}`);
+    }
+
+    // 9g-v. Faculty cannot raise → 403
+    {
+      const r = await request('POST', '/api/grievances', {
+        subject: 'Hack', description: 'Should be denied for faculty.',
+      }, state.facultyToken);
+      log('POST /api/grievances (faculty → 403)', r.status === 403, `Status ${r.status}`);
+    }
+
+    // 9g-vi. Performance endpoints (200 with shape, may be empty arrays)
+    {
+      const a = await request('GET', '/api/admin/performance?branch=CSE&sem=4', null, state.adminToken);
+      const okA = a.status === 200 && Array.isArray(a.body.subjects);
+      log('GET /api/admin/performance', okA, `Status ${a.status}`);
+      const bad = await request('GET', '/api/admin/performance', null, state.adminToken);
+      log('GET /api/admin/performance (no params → 400)', bad.status === 400, `Status ${bad.status}`);
+      const f = await request('GET', '/api/faculty/performance?sem=4', null, state.facultyToken);
+      const okF = f.status === 200 && Array.isArray(f.body.subjects);
+      log('GET /api/faculty/performance', okF, `Status ${f.status}`);
+    }
+
+    // 9g-vii. Grade a submission (uses assignment+submission from §5/§6 if present)
+    {
+      const assigns = await request('GET', '/api/faculty/assignments', null, state.facultyToken);
+      let graded = false;
+      if (assigns.status === 200 && Array.isArray(assigns.body) && assigns.body.length > 0) {
+        const aid = assigns.body[0]._id;
+        const subs = await request('GET', `/api/faculty/assignments/${aid}/submissions`, null, state.facultyToken);
+        if (subs.status === 200 && Array.isArray(subs.body) && subs.body.length > 0) {
+          const g = await request('PATCH', `/api/faculty/submissions/${subs.body[0]._id}/grade`, {
+            grade: 'A', remarks: 'Well done', status: 'Graded',
+          }, state.facultyToken);
+          graded = g.status === 200;
+          log('PATCH /api/faculty/submissions/:id/grade', graded, `Status ${g.status}`);
+        }
+      }
+      if (!graded) logSkip('PATCH grade', 'No submissions available to grade');
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
   // Delete test users (admin deletes faculty and student test users)

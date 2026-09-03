@@ -9,10 +9,12 @@ const {
   getAttendanceHistory,
   deleteAssignment,
   deleteSubmission,
+  gradeSubmission,
   getStudentRoster,
   getColleagues
 } = require('../controllers/facultyController');
 const { getFacultyExams } = require('../controllers/examController');
+const { getFacultyPerformance } = require('../controllers/performanceController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 const ROLES = require('../constants/roles');
@@ -35,6 +37,8 @@ router.post('/assignments', upload.single('file'), (req, res, next) => {
 router.get('/assignments/:id/submissions', getAssignmentSubmissions);
 router.delete('/assignments/:id', deleteAssignment);
 router.delete('/submissions/:id', deleteSubmission);
+router.patch('/submissions/:id/grade', gradeSubmission);
+router.get('/performance', getFacultyPerformance);
 
 // --- Classroom Management ---
 

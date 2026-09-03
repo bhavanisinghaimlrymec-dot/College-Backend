@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { addUser, promoteSemester, getUsers, deleteUser, updateUserStatus, getOverview } = require('../controllers/adminController');
+const { getAdminPerformance } = require('../controllers/performanceController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 const ROLES = require('../constants/roles');
@@ -19,5 +20,6 @@ router.get('/users', getUsers);
 router.patch('/users/:id/status', updateUserStatus);
 router.delete('/users/:id', deleteUser);
 router.get('/overview', getOverview);
+router.get('/performance', getAdminPerformance);
 
 module.exports = router;

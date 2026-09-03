@@ -294,6 +294,21 @@ const eventSchema = Joi.object({
   eventType: Joi.string().valid('holiday', 'exam', 'event', 'meeting', 'deadline').optional(),
 });
 
+// POST /api/grievances
+const grievanceSchema = Joi.object({
+  category: Joi.string()
+    .valid('Academic', 'Fees', 'Hostel', 'Transport', 'Faculty', 'Other')
+    .optional(),
+  subject: Joi.string().min(3).required().messages({
+    'any.required': 'Subject is required',
+    'string.min': 'Subject must be at least 3 characters',
+  }),
+  description: Joi.string().min(10).required().messages({
+    'any.required': 'Description is required',
+    'string.min': 'Describe the issue in at least 10 characters',
+  }),
+});
+
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -311,4 +326,5 @@ module.exports = {
   syllabusSchema,
   examNoticeSchema,
   eventSchema,
+  grievanceSchema,
 };

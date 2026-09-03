@@ -195,6 +195,46 @@ exports.getAttendanceHistory = async (req, res) => {
   }
 };
 
+// @desc    Grade a submission (grade + remarks + status)
+// @route   PATCH /api/faculty/submissions/:id/grade
+// @access  Private/Faculty (own assignments only)
+exports.gradeSubmission = async (req, res) => {
+  const { grade, remarks, status } = req.body;
+  try {
+    const submission = await Submission.findById(req.params.id);
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+    const assignment = await Assignment.findById(submission.assignment);
+    if (!assignment || assignment.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only grade submissions for your own assignments' });
+    }
+    if (grade !== undefined) submission.grade = grade;
+    if (remarks !== undefined) submission.remarks = remarks;
+    if (status !== undefined) {
+      if (!['Submitted', 'Graded', 'Late'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+      submission.status = status;
+    } else if (grade !== undefined) {
+      submission.status = 'Graded';
+    }
+    await submission.save();
+
+    notify({
+      toUser: submission.student,
+      type: 'submission',
+      title: `Graded: ${assignment.title}`,
+      body: grade ? `Grade: ${grade}${remarks ? ` • ${remarks}` : ''}` : 'Check your submission.',
+      refId: submission._id,
+    });
+
+    res.json({ message: 'Submission graded', submission });
+  } catch (error) {
+    res.status(500).json({ message: 'Error grading submission' });
+  }
+};
+
 // @desc    Delete a bad submission (e.g., wrong file uploaded)
 // @route   DELETE /api/faculty/submissions/:id
 exports.deleteSubmission = async (req, res) => {
