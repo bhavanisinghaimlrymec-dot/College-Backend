@@ -516,9 +516,49 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9b. NOTIFICATIONS ────────────────────
+  console.log('\n── 9b. NOTIFICATIONS ──');
+
+  if (!state.studentToken) {
+    logSkip('All notification tests', 'Student login failed');
+  } else {
+    // 9b-i. No-auth inbox access (should fail)
+    {
+      const r = await request('GET', '/api/notifications');
+      log('GET /api/notifications (no token)', r.status === 401, `Status ${r.status}`);
+    }
+
+    // 9b-ii. Student inbox (broadcast from 7e + assignment from 5b should be here)
+    {
+      const r = await request('GET', '/api/notifications', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body);
+      log('GET /api/notifications (student)', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9b-iii. Unread count
+    {
+      const r = await request('GET', '/api/notifications/unread-count', null, state.studentToken);
+      const ok = r.status === 200 && typeof r.body.unread === 'number';
+      log('GET /api/notifications/unread-count', ok, `Status ${r.status} | Unread: ${r.body.unread}`);
+    }
+
+    // 9b-iv. Mark all read, then unread must be 0
+    {
+      const m = await request('PATCH', '/api/notifications/read-all', {}, state.studentToken);
+      const c = await request('GET', '/api/notifications/unread-count', null, state.studentToken);
+      const ok = m.status === 200 && c.status === 200 && c.body.unread === 0;
+      log('PATCH /api/notifications/read-all', ok, `Mark: ${m.status} | Unread after: ${c.body.unread}`);
+    }
+
+    // 9b-v. Mark non-existent as read → 404
+    {
+      const r = await request('PATCH', '/api/notifications/000000000000000000000000/read', {}, state.studentToken);
+      log('PATCH /api/notifications/:id/read (missing → 404)', r.status === 404, `Status ${r.status}`);
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
-
   // Delete test users (admin deletes faculty and student test users)
   if (state.adminToken) {
     // First, get user list to find test user IDs

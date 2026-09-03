@@ -4,6 +4,7 @@ const Attendance = require('../models/Attendance');
 const Marks = require('../models/Marks');
 const User = require('../models/User');
 const ROLES = require('../constants/roles');
+const { notify } = require('../utils/notify');
 
 // @desc    Create a new assignment
 // @route   POST /api/faculty/assignments
@@ -23,6 +24,15 @@ exports.createAssignment = async (req, res) => {
       facultyName: req.user.name
     });
     res.status(201).json(assignment);
+
+    notify({
+      toRole: ROLES.STUDENT,
+      branch,
+      type: 'assignment',
+      title: `New assignment: ${assignment.title}`,
+      body: `${assignment.subject} • due ${assignment.deadline ? new Date(assignment.deadline).toDateString() : 'soon'} • by ${req.user.name}`,
+      refId: assignment._id,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error creating assignment' });
   }
@@ -113,6 +123,18 @@ exports.uploadMarks = async (req, res) => {
     }));
 
     await Marks.insertMany(formattedMarks, { ordered: false });
+
+    // Notify each distinct student once (fire-and-forget).
+    const studentIds = [...new Set(formattedMarks.map((m) => m.student.toString()))];
+    const sample = formattedMarks[0];
+    studentIds.forEach((studentId) => {
+      notify({
+        toUser: studentId,
+        type: 'marks',
+        title: `Marks published: ${sample.subject} (${sample.assessmentName})`,
+        body: 'Check your marks in the app.',
+      });
+    });
     res.status(201).json({ message: 'Marks uploaded successfully' });
   } catch (error) {
     // Duplicate (student+subject+assessment) hits the unique compound index.

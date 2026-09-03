@@ -3,6 +3,7 @@ const Submission = require('../models/Submission');
 const Attendance = require('../models/Attendance');
 const Marks = require('../models/Marks');
 const mongoose = require('mongoose');
+const { notify } = require('../utils/notify');
 
 // @desc    Get assignments for the student's branch and semester
 // @route   GET /api/student/assignments
@@ -45,6 +46,19 @@ exports.submitAssignment = async (req, res) => {
       fileUrl
     });
     res.status(201).json(submission);
+
+    // Tell the owning faculty (fire-and-forget).
+    Assignment.findById(assignmentId).select('createdBy title').then((a) => {
+      if (a && a.createdBy) {
+        notify({
+          toUser: a.createdBy,
+          type: 'submission',
+          title: `New submission: ${a.title}`,
+          body: `${req.user.name} (${req.user.usn}) submitted.`,
+          refId: submission._id,
+        });
+      }
+    }).catch(() => {});
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ message: 'You have already submitted this assignment' });

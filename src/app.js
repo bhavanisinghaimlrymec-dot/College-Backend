@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const facultyRoutes = require('./routes/facultyRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const feedRoutes = require('./routes/feedRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/feed', feedRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Root Test
 app.get('/', (req, res) => {

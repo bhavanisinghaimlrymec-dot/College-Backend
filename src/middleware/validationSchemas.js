@@ -30,9 +30,9 @@ const addUserSchema = Joi.object({
     'any.required': 'Password is required',
     'string.min': 'Password must be at least 6 characters',
   }),
-  role: Joi.string().valid(ROLES.STUDENT, ROLES.FACULTY, ROLES.ADMIN).required().messages({
+  role: Joi.string().valid(ROLES.STUDENT, ROLES.FACULTY, ROLES.HOD, ROLES.PRINCIPAL, ROLES.ADMIN).required().messages({
     'any.required': 'Role is required',
-    'any.only': 'Role must be one of: student, faculty, admin',
+    'any.only': 'Role must be one of: student, faculty, hod, principal, admin',
   }),
   branch: Joi.string().required().messages({
     'any.required': 'Branch is required',

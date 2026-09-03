@@ -1,5 +1,6 @@
 const FeedPost = require('../models/FeedPost');
 const ROLES = require('../constants/roles');
+const { notify } = require('../utils/notify');
 
 // @desc    Create a new post
 // @route   POST /api/feed/create
@@ -21,6 +22,15 @@ exports.createPost = async (req, res) => {
     });
 
     res.status(201).json(post);
+
+    notify({
+      toRole: 'all',
+      branch: post.branchTag || 'All',
+      type: 'post',
+      title: `New post: ${post.title}`,
+      body: `${post.authorName} posted in ${post.branchTag || 'All'}`,
+      refId: post._id,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error creating post' });
   }
@@ -108,6 +118,15 @@ exports.createBroadcast = async (req, res) => {
     });
 
     res.status(201).json(broadcast);
+
+    notify({
+      toRole: 'all',
+      branch: 'All',
+      type: 'broadcast',
+      title: `Announcement: ${broadcast.title}`,
+      body: broadcast.content,
+      refId: broadcast._id,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error creating broadcast' });
   }

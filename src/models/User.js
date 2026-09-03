@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   usn: { type: String, required: true, unique: true }, // For Faculty, use Employee ID
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['admin', 'faculty', 'student'], required: true },
+  role: { type: String, enum: ['admin', 'principal', 'hod', 'faculty', 'student'], required: true },
   branch: { type: String, required: true },
   sem: { type: Number }, // Only relevant for students
   isActive: { type: Boolean, default: true },
