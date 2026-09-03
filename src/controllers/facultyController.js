@@ -116,9 +116,27 @@ exports.uploadMarks = async (req, res) => {
   const { marksList } = req.body; // Expecting an array of marks objects
 
   try {
+    // Department guard: every subject must be offered in the faculty's own
+    // branch. Kills cross-department uploads and free-text code typos.
+    const Subject = require('../models/Subject');
+    const offerings = await Subject.find({ branch: req.user.branch }).select('subjectCode');
+    const validCodes = new Set(offerings.map((o) => o.subjectCode.toUpperCase()));
+    const invalid = [...new Set(
+      marksList
+        .map((m) => (m.subject || '').toString().toUpperCase())
+        .filter((code) => !validCodes.has(code))
+    )];
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        message: `Unknown subject(s) for your department (${req.user.branch}): ${invalid.join(', ')}. Ask your HOD to add them first.`,
+        invalidSubjects: invalid,
+      });
+    }
+
     // Add faculty ID to each mark entry
     const formattedMarks = marksList.map(mark => ({
       ...mark,
+      subject: (mark.subject || '').toString().toUpperCase().trim(),
       faculty: req.user._id
     }));
 

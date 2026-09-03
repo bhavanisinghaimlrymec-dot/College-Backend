@@ -221,6 +221,40 @@ const leaveDecisionSchema = Joi.object({
   remark: Joi.string().allow('').optional(),
 });
 
+// POST /api/subjects
+const subjectSchema = Joi.object({
+  branch: Joi.string().required().messages({
+    'any.required': 'Branch is required',
+  }),
+  sem: Joi.number().integer().min(1).max(8).required().messages({
+    'any.required': 'Semester is required',
+  }),
+  subjectCode: Joi.string().required().messages({
+    'any.required': 'Subject code is required',
+  }),
+  subjectName: Joi.string().required().messages({
+    'any.required': 'Subject name is required',
+  }),
+  totalModules: Joi.number().integer().min(1).default(5),
+  faculty: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional().allow(null, ''),
+});
+
+// POST /api/syllabus
+const syllabusSchema = Joi.object({
+  subject: Joi.string().required().messages({
+    'any.required': 'Subject is required',
+  }),
+  date: Joi.date().iso().optional(),
+  topicCovered: Joi.string().min(3).required().messages({
+    'any.required': 'Topic covered is required',
+    'string.min': 'Topic must be at least 3 characters',
+  }),
+  moduleNo: Joi.number().integer().min(1).required().messages({
+    'any.required': 'Module number is required',
+  }),
+  periodsUsed: Joi.number().integer().min(1).optional(),
+});
+
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -234,4 +268,6 @@ module.exports = {
   changePasswordSchema,
   leaveApplySchema,
   leaveDecisionSchema,
+  subjectSchema,
+  syllabusSchema,
 };

@@ -10,6 +10,8 @@ const studentRoutes = require('./routes/studentRoutes');
 const feedRoutes = require('./routes/feedRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
+const subjectRoutes = require('./routes/subjectRoutes');
+const syllabusRoutes = require('./routes/syllabusRoutes');
 
 const app = express();
 
@@ -25,6 +27,8 @@ app.use('/api/student', studentRoutes);
 app.use('/api/feed', feedRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/leaves', leaveRoutes);
+app.use('/api/subjects', subjectRoutes);
+app.use('/api/syllabus', syllabusRoutes);
 
 // Root Test
 app.get('/', (req, res) => {

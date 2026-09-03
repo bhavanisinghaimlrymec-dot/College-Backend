@@ -612,6 +612,87 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9d. SUBJECTS + SYLLABUS + DEPT MARKS GUARD ──
+  console.log('\n── 9d. SUBJECTS + SYLLABUS ──');
+
+  if (!state.adminToken || !state.facultyToken || !state.studentToken) {
+    logSkip('All subject/syllabus tests', 'Need admin + faculty + student tokens');
+  } else {
+    // 9d-i. Admin creates an offering
+    let subjectOk = false;
+    {
+      const r = await request('POST', '/api/subjects', {
+        branch: 'CSE', sem: 4, subjectCode: '21CS41', subjectName: 'Test Subject', totalModules: 5,
+      }, state.adminToken);
+      subjectOk = r.status === 201 || (r.status === 409 && r.body.message && r.body.message.includes('already exists'));
+      log('POST /api/subjects (admin)', subjectOk, `Status ${r.status}`);
+    }
+
+    // 9d-ii. Duplicate offering → 409
+    {
+      const r = await request('POST', '/api/subjects', {
+        branch: 'CSE', sem: 4, subjectCode: '21CS41', subjectName: 'Dupe', totalModules: 5,
+      }, state.adminToken);
+      log('POST /api/subjects (duplicate → 409)', r.status === 409, `Status ${r.status}`);
+    }
+
+    // 9d-iii. Faculty lists own-branch offerings
+    {
+      const r = await request('GET', '/api/subjects?branch=CSE&sem=4', null, state.facultyToken);
+      const ok = r.status === 200 && Array.isArray(r.body) && r.body.length >= 1;
+      log('GET /api/subjects?branch=CSE&sem=4', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9d-iv. Faculty logs syllabus for the offering
+    {
+      const r = await request('POST', '/api/syllabus', {
+        subject: '21CS41', topicCovered: 'Automated test topic', moduleNo: 1, periodsUsed: 2,
+      }, state.facultyToken);
+      log('POST /api/syllabus', r.status === 201, `Status ${r.status} | ${JSON.stringify(r.body).substring(0, 100)}`);
+    }
+
+    // 9d-v. Same-day duplicate log → 409
+    {
+      const r = await request('POST', '/api/syllabus', {
+        subject: '21CS41', topicCovered: 'Another topic', moduleNo: 2,
+      }, state.facultyToken);
+      log('POST /api/syllabus (dupe day → 409)', r.status === 409, `Status ${r.status}`);
+    }
+
+    // 9d-vi. Unknown subject → 400
+    {
+      const r = await request('POST', '/api/syllabus', {
+        subject: 'NOPE999', topicCovered: 'Ghost topic', moduleNo: 1,
+      }, state.facultyToken);
+      log('POST /api/syllabus (unknown subject → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9d-vii. Student syllabus view shows progress
+    {
+      const r = await request('GET', '/api/syllabus', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body);
+      log('GET /api/syllabus (student)', ok, `Status ${r.status} | Subjects: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9d-viii. Student cannot log syllabus → 403
+    {
+      const r = await request('POST', '/api/syllabus', {
+        subject: '21CS41', topicCovered: 'Hack', moduleNo: 1,
+      }, state.studentToken);
+      log('POST /api/syllabus (student → 403)', r.status === 403, `Status ${r.status}`);
+    }
+
+    // 9d-ix. Marks for unknown subject → 400 (department guard)
+    if (state.createdStudentId) {
+      const r = await request('POST', '/api/faculty/marks', {
+        marksList: [
+          { student: state.createdStudentId, subject: 'GHOST101', assessmentName: 'IA9', marksObtained: 10, maxMarks: 20 }
+        ]
+      }, state.facultyToken);
+      log('POST /api/faculty/marks (unknown subject → 400)', r.status === 400, `Status ${r.status} | ${JSON.stringify(r.body).substring(0, 100)}`);
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
   // Delete test users (admin deletes faculty and student test users)
