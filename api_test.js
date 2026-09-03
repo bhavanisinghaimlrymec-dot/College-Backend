@@ -788,6 +788,54 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9f. ACADEMIC CALENDAR EVENTS ──
+  console.log('\n── 9f. EVENTS ──');
+
+  if (!state.adminToken || !state.studentToken) {
+    logSkip('All event tests', 'Need admin + student tokens');
+  } else {
+    // 9f-i. Admin creates a branch event
+    let eventId = null;
+    {
+      const r = await request('POST', '/api/events', {
+        title: 'Test Sports Day', description: 'Automated test event',
+        date: '2026-12-10', branch: 'CSE', eventType: 'event',
+      }, state.adminToken);
+      const ok = r.status === 201 && r.body.id;
+      if (ok) eventId = r.body.id;
+      log('POST /api/events (admin)', ok, `Status ${r.status} | ID: ${eventId || 'N/A'}`);
+    }
+
+    // 9f-ii. Invalid body → 400
+    {
+      const r = await request('POST', '/api/events', { title: 'No date' }, state.adminToken);
+      log('POST /api/events (invalid → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9f-iii. Student sees it (own branch scope)
+    {
+      const r = await request('GET', '/api/events', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body) && r.body.length >= 1;
+      log('GET /api/events (student)', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9f-iv. Student cannot create → 403
+    {
+      const r = await request('POST', '/api/events', { title: 'Hack', date: '2026-12-11' }, state.studentToken);
+      log('POST /api/events (student → 403)', r.status === 403, `Status ${r.status}`);
+    }
+
+    if (eventId) {
+      // 9f-v. Update then delete
+      const u = await request('PUT', `/api/events/${eventId}`, { title: 'Test Sports Day (edited)' }, state.adminToken);
+      log('PUT /api/events/:id', u.status === 200, `Status ${u.status}`);
+      const d = await request('DELETE', `/api/events/${eventId}`, null, state.adminToken);
+      log('DELETE /api/events/:id', d.status === 200, `Status ${d.status}`);
+    } else {
+      logSkip('PUT/DELETE /api/events/:id', 'No event created');
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
   // Delete test users (admin deletes faculty and student test users)

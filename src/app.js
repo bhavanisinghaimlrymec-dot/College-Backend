@@ -13,6 +13,7 @@ const leaveRoutes = require('./routes/leaveRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
 const syllabusRoutes = require('./routes/syllabusRoutes');
 const examNoticeRoutes = require('./routes/examNoticeRoutes');
+const eventRoutes = require('./routes/eventRoutes');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/leaves', leaveRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/syllabus', syllabusRoutes);
 app.use('/api/admin/exam-notices', examNoticeRoutes);
+app.use('/api/events', eventRoutes);
 
 // Root Test
 app.get('/', (req, res) => {

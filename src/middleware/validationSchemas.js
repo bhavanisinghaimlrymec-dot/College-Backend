@@ -279,6 +279,21 @@ const examNoticeSchema = Joi.object({
   startTime: Joi.string().optional().allow('', null),
 });
 
+// POST /api/events
+const eventSchema = Joi.object({
+  title: Joi.string().required().messages({
+    'any.required': 'Title is required',
+  }),
+  description: Joi.string().optional().allow(''),
+  date: Joi.date().iso().required().messages({
+    'any.required': 'Date is required',
+    'date.format': 'Date must be a valid ISO date',
+  }),
+  endDate: Joi.date().iso().optional(),
+  branch: Joi.string().optional(),
+  eventType: Joi.string().valid('holiday', 'exam', 'event', 'meeting', 'deadline').optional(),
+});
+
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -295,4 +310,5 @@ module.exports = {
   subjectSchema,
   syllabusSchema,
   examNoticeSchema,
+  eventSchema,
 };
