@@ -6,6 +6,7 @@ const {
   getAssignmentSubmissions, 
   takeAttendance, 
   uploadMarks,
+  getAttendanceHistory,
   deleteAssignment,
   deleteSubmission,
   getStudentRoster
@@ -37,6 +38,7 @@ router.delete('/submissions/:id', deleteSubmission);
 
 // STEP 6: validate attendance and marks payloads
 router.post('/attendance', validate(attendanceSchema), takeAttendance);
+router.get('/attendance', getAttendanceHistory);
 router.post('/marks', validate(marksSchema), uploadMarks);
 
 // STEP 5: GET /api/faculty/students — student roster by branch+sem

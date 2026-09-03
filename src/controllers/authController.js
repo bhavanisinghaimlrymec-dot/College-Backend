@@ -34,6 +34,29 @@ exports.login = async (req, res) => {
   }
 };
 
+// @desc    Change logged-in user's password
+// @route   POST /api/auth/change-password
+// @access  Private (requires Bearer token)
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (!(await user.matchPassword(currentPassword))) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+    // NOTE: must use .save() (not findByIdAndUpdate) so the
+    // pre('save') hook re-hashes the new password via bcrypt.
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error changing password' });
+  }
+};
+
 // @desc    Get logged-in user's profile
 // @route   GET /api/auth/profile
 // @access  Private (requires Bearer token)

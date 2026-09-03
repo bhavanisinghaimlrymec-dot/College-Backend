@@ -2,6 +2,10 @@ const User = require('../models/User');
 const ROLES = require('../constants/roles');
 const Attendance = require('../models/Attendance');
 const FeedPost = require('../models/FeedPost');
+const Assignment = require('../models/Assignment');
+const Submission = require('../models/Submission');
+const Marks = require('../models/Marks');
+const TimetableSlot = require('../models/TimetableSlot');
 
 // @desc    Register a new user (Student or Faculty)
 // @route   POST /api/admin/add-user
@@ -79,29 +83,62 @@ exports.getUsers = async (req, res) => {
     if (req.query.role) filter.role = req.query.role;
     if (req.query.branch) filter.branch = req.query.branch;
 
-    const users = await User.find(filter)
-      .select('name usn email role branch sem isActive')
-      .sort({ createdAt: -1 });
+    // Optional pagination: only when ?page or ?limit is passed, so existing
+    // clients that expect a plain array keep working unchanged.
+    const wantsPagination = req.query.page !== undefined || req.query.limit !== undefined;
+    if (!wantsPagination) {
+      const users = await User.find(filter)
+        .select('name usn email role branch sem isActive')
+        .sort({ createdAt: -1 });
 
-    // Map _id to id for cleaner API response
-    const result = users.map((u) => ({
-      id: u._id,
-      name: u.name,
-      usn: u.usn,
-      email: u.email,
-      role: u.role,
-      branch: u.branch,
-      sem: u.sem,
-      isActive: u.isActive,
-    }));
+      // Map _id to id for cleaner API response
+      const result = users.map((u) => ({
+        id: u._id,
+        name: u.name,
+        usn: u.usn,
+        email: u.email,
+        role: u.role,
+        branch: u.branch,
+        sem: u.sem,
+        isActive: u.isActive,
+      }));
 
-    res.json(result);
+      return res.json(result);
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const [total, users] = await Promise.all([
+      User.countDocuments(filter),
+      User.find(filter)
+        .select('name usn email role branch sem isActive')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+    ]);
+
+    res.json({
+      data: users.map((u) => ({
+        id: u._id,
+        name: u.name,
+        usn: u.usn,
+        email: u.email,
+        role: u.role,
+        branch: u.branch,
+        sem: u.sem,
+        isActive: u.isActive,
+      })),
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching users' });
   }
 };
 
-// @desc    Delete a user by ID
+// @desc    Delete a user by ID (with cascade cleanup of their data)
 // @route   DELETE /api/admin/users/:id
 // @access  Private/Admin
 exports.deleteUser = async (req, res) => {
@@ -112,8 +149,46 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Prevent locking everyone out: never delete the last active admin.
+    if (user.role === ROLES.ADMIN) {
+      const adminCount = await User.countDocuments({ role: ROLES.ADMIN });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'Cannot delete the last admin account' });
+      }
+    }
+
+    const userId = user._id;
+
+    if (user.role === ROLES.STUDENT) {
+      await Promise.all([
+        Submission.deleteMany({ student: userId }),
+        Marks.deleteMany({ student: userId }),
+        // Remove the student's embedded rows from all attendance sessions
+        Attendance.updateMany(
+          { 'records.student': userId },
+          { $pull: { records: { student: userId } } }
+        ),
+      ]);
+    }
+
+    if (user.role === ROLES.FACULTY) {
+      // Assignments owned by this faculty + their submissions
+      const owned = await Assignment.find({ createdBy: userId }).select('_id');
+      const ownedIds = owned.map((a) => a._id);
+      await Promise.all([
+        Submission.deleteMany({ assignment: { $in: ownedIds } }),
+        Assignment.deleteMany({ createdBy: userId }),
+        Attendance.deleteMany({ faculty: userId }),
+        Marks.deleteMany({ faculty: userId }),
+        TimetableSlot.deleteMany({ faculty: userId }),
+      ]);
+    }
+
+    // Feed posts authored by this user (any role)
+    await FeedPost.deleteMany({ author: userId });
+
     await user.deleteOne();
-    res.json({ message: `User ${user.name} (${user.usn}) deleted successfully` });
+    res.json({ message: `User ${user.name} (${user.usn}) and their associated data deleted successfully` });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting user' });
   }

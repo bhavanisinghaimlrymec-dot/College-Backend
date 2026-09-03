@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
-const { login, getProfile } = require('../controllers/authController');
+const { login, getProfile, changePassword } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validationMiddleware');
-const { loginSchema } = require('../middleware/validationSchemas');
+const { loginSchema, changePasswordSchema } = require('../middleware/validationSchemas');
 
 // --- STEP 7: Rate limiting on login to prevent brute-force attacks ---
 const loginLimiter = rateLimit({
@@ -24,5 +24,8 @@ router.post('/login', loginLimiter, validate(loginSchema), login);
 
 // GET /api/auth/profile — requires valid JWT token
 router.get('/profile', protect, getProfile);
+
+// POST /api/auth/change-password — requires valid JWT token
+router.post('/change-password', protect, validate(changePasswordSchema), changePassword);
 
 module.exports = router;

@@ -168,8 +168,7 @@ const broadcastSchema = Joi.object({
 });
 
 // POST /api/admin/promote
-const promoteSchema = Joi.object({
-  branch: Joi.string().required().messages({
+const promoteSchema = Joi.object({  branch: Joi.string().required().messages({
     'any.required': 'Branch is required',
     'string.empty': 'Branch cannot be empty',
   }),
@@ -178,6 +177,44 @@ const promoteSchema = Joi.object({
     'number.min': 'Semester must be between 1 and 8',
     'number.max': 'Semester must be between 1 and 8',
   }),
+});
+
+// POST /api/auth/change-password
+const changePasswordSchema = Joi.object({
+  currentPassword: Joi.string().required().messages({
+    'any.required': 'Current password is required',
+    'string.empty': 'Current password cannot be empty',
+  }),
+  newPassword: Joi.string().min(6).required().messages({
+    'any.required': 'New password is required',
+    'string.empty': 'New password cannot be empty',
+    'string.min': 'New password must be at least 6 characters',
+  }),
+});
+
+// Timetable slot payload (POST /api/timetable, PUT /api/timetable/:id)
+const timetableSchema = Joi.object({
+  day: Joi.string()
+    .valid('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+    .required()
+    .messages({
+      'any.required': 'Day is required',
+      'any.only': 'Day must be a valid weekday name (e.g. Monday)',
+    }),
+  startTime: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/).required().messages({
+    'any.required': 'Start time is required',
+    'string.pattern.base': 'Start time must be in HH:mm 24-hour format',
+  }),
+  endTime: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/).required().messages({
+    'any.required': 'End time is required',
+    'string.pattern.base': 'End time must be in HH:mm 24-hour format',
+  }),
+  subject: Joi.string().required().messages({
+    'any.required': 'Subject is required',
+    'string.empty': 'Subject cannot be empty',
+  }),
+  branch: Joi.string().allow('').optional(),
+  room: Joi.string().allow('').optional(),
 });
 
 module.exports = {
@@ -190,4 +227,6 @@ module.exports = {
   createPostSchema,
   broadcastSchema,
   promoteSchema,
+  changePasswordSchema,
+  timetableSchema,
 };

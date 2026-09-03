@@ -465,8 +465,85 @@ async function runTests() {
     }
   }
 
-  // ──────────────────── 9. CLEANUP TEST DATA ────────────────────
-  console.log('\n── 9. CLEANUP ──');
+  // ──────────────────── 9. NEW ENDPOINTS (change-password, timetable, attendance history) ──
+  console.log('\n── 9. NEW ENDPOINTS ──');
+
+  if (!state.facultyToken) {
+    logSkip('All new-endpoint tests', 'Faculty login failed');
+  } else {
+    // 9a. Change password with wrong current password
+    {
+      const r = await request('POST', '/api/auth/change-password', {
+        currentPassword: 'definitely-wrong',
+        newPassword: 'newpass123',
+      }, state.facultyToken);
+      log('POST /api/auth/change-password (wrong current)', r.status === 401, `Status ${r.status}`);
+    }
+
+    // 9b. Change password validation (short new password)
+    {
+      const r = await request('POST', '/api/auth/change-password', {
+        currentPassword: 'password123',
+        newPassword: '123',
+      }, state.facultyToken);
+      log('POST /api/auth/change-password (invalid body)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9c. Change password round-trip on the disposable test faculty account
+    {
+      const r1 = await request('POST', '/api/auth/change-password', {
+        currentPassword: 'password123',
+        newPassword: 'newpass123',
+      }, state.facultyToken);
+      const loginNew = await request('POST', '/api/auth/login', { usn: state.createdFacultyUsn, password: 'newpass123' });
+      const ok = r1.status === 200 && loginNew.status === 200 && loginNew.body.token;
+      if (ok) state.facultyToken = loginNew.body.token;
+      log('POST /api/auth/change-password (round-trip)', ok, `Change: ${r1.status} | Re-login: ${loginNew.status}`);
+      // Restore original password so re-runs of this suite keep working
+      if (ok) {
+        await request('POST', '/api/auth/change-password', {
+          currentPassword: 'newpass123',
+          newPassword: 'password123',
+        }, state.facultyToken);
+      }
+    }
+
+    // 9d. Timetable CRUD + overlap guard
+    {
+      const slot = { day: 'Monday', startTime: '09:00', endTime: '10:00', subject: 'Test Subject', branch: 'CSE', room: 'Room 101' };
+      const c = await request('POST', '/api/timetable', slot, state.facultyToken);
+      const slotId = c.body && (c.body.id || c.body._id);
+      log('POST /api/timetable', c.status === 201 && slotId, `Status ${c.status} | ID: ${slotId || 'N/A'}`);
+
+      const g = await request('GET', '/api/timetable', null, state.facultyToken);
+      log('GET /api/timetable', g.status === 200 && Array.isArray(g.body), `Status ${g.status} | Count: ${Array.isArray(g.body) ? g.body.length : 'N/A'}`);
+
+      const o = await request('POST', '/api/timetable', { ...slot, subject: 'Overlap' }, state.facultyToken);
+      log('POST /api/timetable (overlap → 409)', o.status === 409, `Status ${o.status}`);
+
+      const v = await request('POST', '/api/timetable', { ...slot, day: 'Tuesday' }, state.facultyToken);
+      log('POST /api/timetable (invalid → 400)', v.status === 400, `Status ${v.status}`);
+
+      if (slotId) {
+        const u = await request('PUT', `/api/timetable/${slotId}`, { room: 'Room 202' }, state.facultyToken);
+        log('PUT /api/timetable/:id', u.status === 200, `Status ${u.status}`);
+        const d = await request('DELETE', `/api/timetable/${slotId}`, null, state.facultyToken);
+        log('DELETE /api/timetable/:id', d.status === 200, `Status ${d.status}`);
+      } else {
+        logSkip('PUT/DELETE /api/timetable/:id', 'No slot created');
+      }
+    }
+
+    // 9e. Faculty attendance history
+    {
+      const r = await request('GET', '/api/faculty/attendance', null, state.facultyToken);
+      const ok = r.status === 200 && Array.isArray(r.body);
+      log('GET /api/faculty/attendance', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+  }
+
+  // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
+  console.log('\n── 10. CLEANUP ──');
 
   // Delete test users (admin deletes faculty and student test users)
   if (state.adminToken) {

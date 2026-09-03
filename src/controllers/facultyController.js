@@ -112,10 +112,46 @@ exports.uploadMarks = async (req, res) => {
       faculty: req.user._id
     }));
 
-    await Marks.insertMany(formattedMarks);
+    await Marks.insertMany(formattedMarks, { ordered: false });
     res.status(201).json({ message: 'Marks uploaded successfully' });
   } catch (error) {
+    // Duplicate (student+subject+assessment) hits the unique compound index.
+    // insertMany with ordered:false inserts the rest; surface a clear 409.
+    if (error.code === 11000 || (error.writeErrors || []).some((e) => e.code === 11000)) {
+      const inserted = typeof error.result?.nInserted === 'number'
+        ? error.result.nInserted
+        : (error.insertedCount ?? 0);
+      return res.status(409).json({
+        message: 'Some entries already exist and were skipped. Update is not supported yet — delete and re-upload if a correction is needed.',
+        inserted,
+      });
+    }
     res.status(500).json({ message: 'Error uploading marks. Some entries may already exist.' });
+  }
+};
+
+// @desc    Get attendance sessions taken by the logged-in faculty
+// @route   GET /api/faculty/attendance?subject=&branch=&sem=
+// @access  Private/Faculty
+exports.getAttendanceHistory = async (req, res) => {
+  try {
+    const filter = { faculty: req.user._id };
+    if (req.query.subject) filter.subject = req.query.subject;
+    if (req.query.branch) filter.branch = req.query.branch;
+    if (req.query.sem) filter.sem = Number(req.query.sem);
+
+    const sessions = await Attendance.find(filter)
+      .sort({ date: -1 })
+      .lean();
+
+    res.json(sessions.map((s) => ({
+      ...s,
+      presentCount: (s.records || []).filter((r) => r.status === 'Present').length,
+      absentCount: (s.records || []).filter((r) => r.status === 'Absent').length,
+      totalCount: (s.records || []).length,
+    })));
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance history' });
   }
 };
 

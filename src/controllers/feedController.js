@@ -32,14 +32,38 @@ exports.createPost = async (req, res) => {
 exports.getPosts = async (req, res) => {
   try {
     // Show posts for their specific branch OR posts tagged for 'All'
-    const posts = await FeedPost.find({
+    const filter = {
       $or: [
         { branchTag: 'All' },
         { branchTag: req.user.branch }
       ]
-    }).sort({ createdAt: -1 }); // Newest first
+    };
 
-    res.json(posts);
+    // Optional pagination: only when ?page or ?limit is passed, so existing
+    // clients that expect a plain array keep working unchanged.
+    const wantsPagination = req.query.page !== undefined || req.query.limit !== undefined;
+    if (!wantsPagination) {
+      const posts = await FeedPost.find(filter).sort({ createdAt: -1 }); // Newest first
+      return res.json(posts);
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const [total, posts] = await Promise.all([
+      FeedPost.countDocuments(filter),
+      FeedPost.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+    ]);
+
+    res.json({
+      data: posts,
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching feed' });
   }
