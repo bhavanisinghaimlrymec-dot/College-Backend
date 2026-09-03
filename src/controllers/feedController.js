@@ -39,11 +39,22 @@ exports.createPost = async (req, res) => {
 
 // Audience filter: admins/principals see everything; students see
 // everyone+students; faculty/hod see everyone+faculty — always combined
-// with the branch scope.
+// with the branch scope. Posts created before the audience field existed
+// have no audience key and are treated as 'everyone'.
 const audienceFilter = (user) => {
-  if ([ROLES.ADMIN, ROLES.PRINCIPAL].includes(user.role)) return {};
-  if (user.role === ROLES.STUDENT) return { audience: { $in: ['everyone', 'students'] } };
-  return { audience: { $in: ['everyone', 'faculty'] } };
+  const allowed =
+    [ROLES.ADMIN, ROLES.PRINCIPAL].includes(user.role)
+      ? ['everyone', 'students', 'faculty']
+      : user.role === ROLES.STUDENT
+        ? ['everyone', 'students']
+        : ['everyone', 'faculty'];
+  return {
+    $or: [
+      { audience: { $in: allowed } },
+      { audience: { $exists: false } },
+      { audience: null },
+    ],
+  };
 };
 
 // @desc    Get all posts (filtered by branch + audience)
