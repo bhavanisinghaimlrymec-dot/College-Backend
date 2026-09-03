@@ -7,6 +7,7 @@ const {
     getMyAttendance, 
     getMyMarks 
 } = require('../controllers/studentController');
+const { getMyExams } = require('../controllers/examController');
 
 const { upload } = require('../config/storage');
 const { protect } = require('../middleware/authMiddleware');
@@ -29,5 +30,6 @@ router.post('/submit', upload.single('file'), (req, res, next) => {
 
 router.get('/my-attendance', getMyAttendance);
 router.get('/my-marks', getMyMarks);
+router.get('/exams', getMyExams);
 
 module.exports = router;

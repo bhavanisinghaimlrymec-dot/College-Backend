@@ -693,6 +693,76 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9e. EXAM NOTICES (hall-ticket notice only) ──
+  console.log('\n── 9e. EXAM NOTICES ──');
+
+  if (!state.adminToken || !state.studentToken || !state.facultyToken) {
+    logSkip('All exam notice tests', 'Need admin + student + faculty tokens');
+  } else {
+    // 9e-i. Admin creates a notice
+    let noticeId = null;
+    {
+      const r = await request('POST', '/api/admin/exam-notices', {
+        title: 'SEE Nov 2026', examType: 'SEE', branch: 'CSE', sem: 4,
+        subject: '21CS41', subjectName: 'Test Subject', date: '2026-11-20',
+      }, state.adminToken);
+      const ok = r.status === 201 && r.body.id;
+      if (ok) noticeId = r.body.id;
+      log('POST /api/admin/exam-notices', ok, `Status ${r.status} | ID: ${noticeId || 'N/A'}`);
+    }
+
+    // 9e-ii. Invalid body → 400
+    {
+      const r = await request('POST', '/api/admin/exam-notices', { title: 'Bad' }, state.adminToken);
+      log('POST /api/admin/exam-notices (invalid → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9e-iii. Student sees own exams
+    {
+      const r = await request('GET', '/api/student/exams', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body) && r.body.length >= 1;
+      log('GET /api/student/exams', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9e-iv. Faculty exams without params → 400; with params → 200
+    {
+      const bad = await request('GET', '/api/faculty/exams', null, state.facultyToken);
+      const good = await request('GET', '/api/faculty/exams?branch=CSE&sem=4', null, state.facultyToken);
+      log('GET /api/faculty/exams (no params → 400)', bad.status === 400, `Status ${bad.status}`);
+      log('GET /api/faculty/exams (filtered)', good.status === 200 && Array.isArray(good.body), `Status ${good.status}`);
+    }
+
+    // 9e-v. Student cannot create → 403
+    {
+      const r = await request('POST', '/api/admin/exam-notices', {
+        title: 'Hack', branch: 'CSE', sem: 4, date: '2026-11-21',
+      }, state.studentToken);
+      log('POST /api/admin/exam-notices (student → 403)', r.status === 403, `Status ${r.status}`);
+    }
+
+    if (noticeId) {
+      // 9e-vi. Release → student inbox gets the notice
+      const rel = await request('PATCH', `/api/admin/exam-notices/${noticeId}/release`, {
+        collectionPoint: 'Exam section, Admin block',
+      }, state.adminToken);
+      const ok = rel.status === 200 && rel.body.noticeReleased === true;
+      log('PATCH /api/admin/exam-notices/:id/release', ok, `Status ${rel.status}`);
+      const inbox = await request('GET', '/api/notifications', null, state.studentToken);
+      const found = Array.isArray(inbox.body) && inbox.body.some((n) => n.type === 'exam');
+      log('Release pushed exam notification', found, `Inbox has exam item: ${found}`);
+
+      // 9e-vii. Double release → 409, no duplicate push
+      const dup = await request('PATCH', `/api/admin/exam-notices/${noticeId}/release`, {}, state.adminToken);
+      log('PATCH release twice (→ 409)', dup.status === 409, `Status ${dup.status}`);
+
+      // 9e-viii. Delete
+      const del = await request('DELETE', `/api/admin/exam-notices/${noticeId}`, null, state.adminToken);
+      log('DELETE /api/admin/exam-notices/:id', del.status === 200, `Status ${del.status}`);
+    } else {
+      logSkip('Release/delete exam notice tests', 'No notice created');
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
   // Delete test users (admin deletes faculty and student test users)

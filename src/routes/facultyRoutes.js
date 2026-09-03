@@ -12,6 +12,7 @@ const {
   getStudentRoster,
   getColleagues
 } = require('../controllers/facultyController');
+const { getFacultyExams } = require('../controllers/examController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 const ROLES = require('../constants/roles');
@@ -47,5 +48,8 @@ router.get('/students', getStudentRoster);
 
 // Leave substitute picker: colleagues in the same department.
 router.get('/colleagues', getColleagues);
+
+// Exam list for a class (seating itself goes out as a feed image).
+router.get('/exams', getFacultyExams);
 
 module.exports = router;

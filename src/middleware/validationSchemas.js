@@ -255,6 +255,27 @@ const syllabusSchema = Joi.object({
   periodsUsed: Joi.number().integer().min(1).optional(),
 });
 
+// POST /api/admin/exam-notices
+const examNoticeSchema = Joi.object({
+  title: Joi.string().required().messages({
+    'any.required': 'Title is required',
+  }),
+  examType: Joi.string().valid('IA-1', 'IA-2', 'SEE', 'Supplementary', 'Other').optional(),
+  branch: Joi.string().required().messages({
+    'any.required': 'Branch is required',
+  }),
+  sem: Joi.number().integer().min(1).max(8).required().messages({
+    'any.required': 'Semester is required',
+  }),
+  subject: Joi.string().optional().allow('', null),
+  subjectName: Joi.string().optional().allow('', null),
+  date: Joi.date().iso().required().messages({
+    'any.required': 'Exam date is required',
+    'date.format': 'Date must be a valid ISO date',
+  }),
+  startTime: Joi.string().optional().allow('', null),
+});
+
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -270,4 +291,5 @@ module.exports = {
   leaveDecisionSchema,
   subjectSchema,
   syllabusSchema,
+  examNoticeSchema,
 };
