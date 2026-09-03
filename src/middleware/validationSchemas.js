@@ -192,6 +192,35 @@ const changePasswordSchema = Joi.object({
   }),
 });
 
+// POST /api/leaves — substitute/periods enforced per-track in the controller
+const leaveApplySchema = Joi.object({
+  from: Joi.date().iso().required().messages({
+    'any.required': 'Leave start date is required',
+    'date.format': 'Start date must be a valid ISO date',
+  }),
+  to: Joi.date().iso().required().messages({
+    'any.required': 'Leave end date is required',
+    'date.format': 'End date must be a valid ISO date',
+  }),
+  reason: Joi.string().min(3).required().messages({
+    'any.required': 'Reason is required',
+    'string.min': 'Reason must be at least 3 characters',
+  }),
+  substitute: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional().messages({
+    'string.pattern.base': 'Substitute must be a valid user id',
+  }),
+  periodsAffected: Joi.array().items(Joi.string()).optional(),
+});
+
+// PATCH /api/leaves/:id/decision
+const leaveDecisionSchema = Joi.object({
+  decision: Joi.string().valid('approve', 'reject').required().messages({
+    'any.required': 'Decision is required',
+    'any.only': "Decision must be 'approve' or 'reject'",
+  }),
+  remark: Joi.string().allow('').optional(),
+});
+
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -203,4 +232,6 @@ module.exports = {
   broadcastSchema,
   promoteSchema,
   changePasswordSchema,
+  leaveApplySchema,
+  leaveDecisionSchema,
 };

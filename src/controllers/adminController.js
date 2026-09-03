@@ -5,6 +5,8 @@ const FeedPost = require('../models/FeedPost');
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Marks = require('../models/Marks');
+const Notification = require('../models/Notification');
+const Leave = require('../models/Leave');
 
 // @desc    Register a new user (Student or Faculty)
 // @route   POST /api/admin/add-user
@@ -184,6 +186,12 @@ exports.deleteUser = async (req, res) => {
 
     // Feed posts authored by this user (any role)
     await FeedPost.deleteMany({ author: userId });
+
+    // Notifications addressed to them + their leave applications.
+    await Notification.deleteMany({ toUser: userId });
+    await Leave.deleteMany({
+      $or: [{ applicant: userId }, { substitute: userId }],
+    });
 
     await user.deleteOne();
     res.json({ message: `User ${user.name} (${user.usn}) and their associated data deleted successfully` });

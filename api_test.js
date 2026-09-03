@@ -557,6 +557,61 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9c. LEAVE WORKFLOWS ────────────────────
+  console.log('\n── 9c. LEAVE WORKFLOWS ──');
+
+  if (!state.studentToken || !state.facultyToken || !state.adminToken) {
+    logSkip('All leave tests', 'Need student + faculty + admin tokens');
+  } else {
+    // 9c-i. Student applies (goes to HOD of CSE — none exists, stays 'applied')
+    let studentLeaveId = null;
+    {
+      const r = await request('POST', '/api/leaves', {
+        from: '2026-10-01', to: '2026-10-02', reason: 'Family function',
+      }, state.studentToken);
+      const ok = r.status === 201 && r.body.status === 'applied';
+      if (ok) studentLeaveId = r.body.id;
+      log('POST /api/leaves (student apply)', ok, `Status ${r.status} | state=${r.body.status}`);
+    }
+
+    // 9c-ii. Faculty apply without substitute → 400
+    {
+      const r = await request('POST', '/api/leaves', {
+        from: '2026-10-05', to: '2026-10-06', reason: 'No substitute given',
+      }, state.facultyToken);
+      log('POST /api/leaves (faculty, no substitute → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9c-iii. Faculty applies with self as substitute → 400
+    {
+      const me = await request('GET', '/api/auth/profile', null, state.facultyToken);
+      const r = await request('POST', '/api/leaves', {
+        from: '2026-10-05', to: '2026-10-06', reason: 'Self cover',
+        substitute: me.body._id,
+      }, state.facultyToken);
+      log('POST /api/leaves (self substitute → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9c-iv. Invalid leave body → 400
+    {
+      const r = await request('POST', '/api/leaves', {}, state.studentToken);
+      log('POST /api/leaves (invalid → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9c-v. Mine listing contains the fresh application
+    {
+      const r = await request('GET', '/api/leaves?scope=mine', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body) && r.body.length >= 1;
+      log('GET /api/leaves?scope=mine', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9c-vi. Student cannot decide leaves → 403 (route-level role guard)
+    if (studentLeaveId) {
+      const r = await request('PATCH', `/api/leaves/${studentLeaveId}/decision`, { decision: 'approve' }, state.studentToken);
+      log('PATCH /api/leaves/:id/decision (student → 403)', r.status === 403, `Status ${r.status}`);
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
   // Delete test users (admin deletes faculty and student test users)
