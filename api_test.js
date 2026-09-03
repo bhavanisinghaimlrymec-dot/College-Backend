@@ -918,6 +918,56 @@ async function runTests() {
     }
   }
 
+  // ──────────────────── 9h. BROCHURES ──
+  console.log('\n── 9h. BROCHURES ──');
+
+  if (!state.adminToken || !state.studentToken || !state.facultyToken) {
+    logSkip('All brochure tests', 'Need admin + student + faculty tokens');
+  } else {
+    // 9h-i. Faculty uploads via file URL
+    let brochureId = null;
+    {
+      const r = await request('POST', '/api/brochures', {
+        title: 'Test Prospectus',
+        description: 'Automated test brochure',
+        branch: 'All',
+        fileUrl: 'https://example.com/prospectus.pdf',
+      }, state.facultyToken);
+      const ok = r.status === 201 && r.body.id && r.body.fileType === 'pdf';
+      if (ok) brochureId = r.body.id;
+      log('POST /api/brochures (faculty, pdf url)', ok, `Status ${r.status} | type=${r.body.fileType}`);
+    }
+
+    // 9h-ii. Upload without file → 400
+    {
+      const r = await request('POST', '/api/brochures', { title: 'No file' }, state.facultyToken);
+      log('POST /api/brochures (no file → 400)', r.status === 400, `Status ${r.status}`);
+    }
+
+    // 9h-iii. Student lists and sees it
+    {
+      const r = await request('GET', '/api/brochures', null, state.studentToken);
+      const ok = r.status === 200 && Array.isArray(r.body);
+      log('GET /api/brochures (student)', ok, `Status ${r.status} | Count: ${Array.isArray(r.body) ? r.body.length : 'N/A'}`);
+    }
+
+    // 9h-iv. Student cannot upload → 403
+    {
+      const r = await request('POST', '/api/brochures', {
+        title: 'Hack', fileUrl: 'https://example.com/x.pdf',
+      }, state.studentToken);
+      log('POST /api/brochures (student → 403)', r.status === 403, `Status ${r.status}`);
+    }
+
+    if (brochureId) {
+      // 9h-v. Owner faculty deletes own upload
+      const d = await request('DELETE', `/api/brochures/${brochureId}`, null, state.facultyToken);
+      log('DELETE /api/brochures/:id (owner)', d.status === 200, `Status ${d.status}`);
+    } else {
+      logSkip('DELETE /api/brochures/:id', 'No brochure created');
+    }
+  }
+
   // ──────────────────── 10. CLEANUP TEST DATA ────────────────────
   console.log('\n── 10. CLEANUP ──');
   // Delete test users (admin deletes faculty and student test users)

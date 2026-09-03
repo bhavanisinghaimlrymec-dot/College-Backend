@@ -15,6 +15,7 @@ const syllabusRoutes = require('./routes/syllabusRoutes');
 const examNoticeRoutes = require('./routes/examNoticeRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const grievanceRoutes = require('./routes/grievanceRoutes');
+const brochureRoutes = require('./routes/brochureRoutes');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/syllabus', syllabusRoutes);
 app.use('/api/admin/exam-notices', examNoticeRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/grievances', grievanceRoutes);
+app.use('/api/brochures', brochureRoutes);
 
 // Root Test
 app.get('/', (req, res) => {

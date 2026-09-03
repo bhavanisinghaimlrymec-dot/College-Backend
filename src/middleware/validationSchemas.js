@@ -309,6 +309,16 @@ const grievanceSchema = Joi.object({
   }),
 });
 
+// POST /api/brochures (file comes via multipart; fileUrl fallback in body)
+const brochureSchema = Joi.object({
+  title: Joi.string().required().messages({
+    'any.required': 'Title is required',
+  }),
+  description: Joi.string().optional().allow(''),
+  branch: Joi.string().optional(),
+  fileUrl: Joi.string().uri().optional().allow(''),
+});
+
 module.exports = {
   loginSchema,
   addUserSchema,
@@ -327,4 +337,5 @@ module.exports = {
   examNoticeSchema,
   eventSchema,
   grievanceSchema,
+  brochureSchema,
 };
