@@ -9,7 +9,8 @@ const {
   getAttendanceHistory,
   deleteAssignment,
   deleteSubmission,
-  getStudentRoster
+  getStudentRoster,
+  getColleagues
 } = require('../controllers/facultyController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
@@ -43,5 +44,8 @@ router.post('/marks', validate(marksSchema), uploadMarks);
 
 // STEP 5: GET /api/faculty/students — student roster by branch+sem
 router.get('/students', getStudentRoster);
+
+// Leave substitute picker: colleagues in the same department.
+router.get('/colleagues', getColleagues);
 
 module.exports = router;

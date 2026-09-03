@@ -227,6 +227,24 @@ exports.deleteAssignment = async (req, res) => {
 
 // --- STEP 5: Student Roster for Faculty ---
 
+// @desc    Get faculty/HOD colleagues in the logged-in faculty's branch
+// @route   GET /api/faculty/colleagues
+// @access  Private/Faculty (used by the leave substitute picker)
+exports.getColleagues = async (req, res) => {
+  try {
+    const colleagues = await User.find({
+      role: { $in: [ROLES.FACULTY, ROLES.HOD] },
+      branch: req.user.branch,
+      _id: { $ne: req.user._id },
+      isActive: true,
+    }).select('name usn').sort({ name: 1 });
+
+    res.json(colleagues.map((c) => ({ id: c._id, name: c.name, usn: c.usn })));
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching colleagues' });
+  }
+};
+
 // @desc    Get list of students by branch and semester
 // @route   GET /api/faculty/students
 // @access  Private/Faculty
