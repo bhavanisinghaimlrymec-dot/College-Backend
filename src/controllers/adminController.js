@@ -239,3 +239,83 @@ exports.getOverview = async (req, res) => {
     res.status(500).json({ message: 'Error loading overview' });
   }
 };
+
+// @desc    Export per-student attendance as CSV, branch+sem wise
+//          (optional ?subject= filter). One row per student x subject.
+// @route   GET /api/admin/attendance/export?branch=&sem=[&subject=]
+// @access  Private/Admin
+exports.exportAttendanceCsv = async (req, res) => {
+  const { branch, sem, subject } = req.query;
+
+  if (!branch || !sem) {
+    return res.status(400).json({
+      message: 'Both "branch" and "sem" query parameters are required',
+    });
+  }
+
+  try {
+    const match = {
+      branch: { $regex: `^${String(branch).trim()}$`, $options: 'i' },
+      sem: Number(sem),
+    };
+    if (subject && String(subject).trim()) {
+      match.subject = String(subject).trim().toUpperCase();
+    }
+
+    const rows = await Attendance.aggregate([
+      { $match: match },
+      { $unwind: '$records' },
+      {
+        $group: {
+          _id: {
+            usn: '$records.studentUsn',
+            name: '$records.studentName',
+            subject: '$subject',
+          },
+          sessions: { $sum: 1 },
+          present: {
+            $sum: {
+              $cond: [{ $eq: ['$records.status', 'Present'] }, 1, 0],
+            },
+          },
+        },
+      },
+      { $sort: { '_id.subject': 1, '_id.usn': 1 } },
+    ]);
+
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [
+      'USN,Student Name,Branch,Sem,Subject,Sessions,Present,Absent,Percentage',
+    ];
+    for (const r of rows) {
+      const absent = r.sessions - r.present;
+      const pct = r.sessions
+        ? ((r.present / r.sessions) * 100).toFixed(1)
+        : '0.0';
+      lines.push(
+        [
+          r._id.usn,
+          r._id.name,
+          String(branch).trim().toUpperCase(),
+          sem,
+          r._id.subject,
+          r.sessions,
+          r.present,
+          absent,
+          pct,
+        ]
+          .map(esc)
+          .join(',')
+      );
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="attendance_${String(branch).trim()}_sem${sem}.csv"`
+    );
+    res.send(lines.join('\n'));
+  } catch (error) {
+    res.status(500).json({ message: 'Error exporting attendance' });
+  }
+};
