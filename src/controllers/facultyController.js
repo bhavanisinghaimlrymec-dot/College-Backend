@@ -286,19 +286,30 @@ exports.deleteAssignment = async (req, res) => {
 
 // --- STEP 5: Student Roster for Faculty ---
 
-// @desc    Get faculty/HOD colleagues in the logged-in faculty's branch
+// @desc    Get faculty/HOD colleagues (same branch by default; ?scope=all
+//          returns every branch — used by the Faculty Directory).
+//          Never returns students.
 // @route   GET /api/faculty/colleagues
 // @access  Private/Faculty (used by the leave substitute picker)
 exports.getColleagues = async (req, res) => {
   try {
-    const colleagues = await User.find({
+    const filter = {
       role: { $in: [ROLES.FACULTY, ROLES.HOD] },
-      branch: req.user.branch,
       _id: { $ne: req.user._id },
       isActive: true,
-    }).select('name usn').sort({ name: 1 });
+    };
+    if (req.query.scope !== 'all') filter.branch = req.user.branch;
+    const colleagues = await User.find(filter)
+      .select('name usn email branch')
+      .sort({ name: 1 });
 
-    res.json(colleagues.map((c) => ({ id: c._id, name: c.name, usn: c.usn })));
+    res.json(colleagues.map((c) => ({
+      id: c._id,
+      name: c.name,
+      usn: c.usn,
+      email: c.email,
+      branch: c.branch,
+    })));
   } catch (error) {
     res.status(500).json({ message: 'Error fetching colleagues' });
   }
