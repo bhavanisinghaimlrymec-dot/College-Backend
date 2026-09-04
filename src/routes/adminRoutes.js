@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { addUser, promoteSemester, getUsers, deleteUser, updateUserStatus, getOverview, exportAttendanceCsv } = require('../controllers/adminController');
+const { setMaintenance } = require('../controllers/settingController');
 const { getAdminPerformance } = require('../controllers/performanceController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
@@ -22,5 +23,6 @@ router.delete('/users/:id', deleteUser);
 router.get('/overview', getOverview);
 router.get('/performance', getAdminPerformance);
 router.get('/attendance/export', exportAttendanceCsv);
+router.patch('/settings/maintenance', setMaintenance);
 
 module.exports = router;

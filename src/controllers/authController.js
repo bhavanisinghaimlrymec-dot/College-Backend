@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const AppSetting = require('../models/AppSetting');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
@@ -15,6 +16,16 @@ exports.login = async (req, res) => {
       return res.status(403).json({ message: 'This account has been suspended. Please contact the administrator.' });
     }
     if (user && (await user.matchPassword(password))) {
+      // Maintenance lockout: students + faculty cannot sign in while on.
+      // Admins, HODs and principals stay in so they can finish the work.
+      if (
+        (user.role === 'student' || user.role === 'faculty') &&
+        (await AppSetting.isMaintenanceOn())
+      ) {
+        return res.status(403).json({
+          message: 'The app is under maintenance. Please try again later.',
+        });
+      }
       res.json({
         _id: user._id,
         name: user.name,
