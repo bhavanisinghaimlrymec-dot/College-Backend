@@ -318,9 +318,11 @@ exports.getStudentRoster = async (req, res) => {
   }
 
   try {
+    // Branch match is case-insensitive exact ('cse' finds 'CSE') so a
+    // casing mismatch can never silently return an empty roster.
     const students = await User.find({
       role: ROLES.STUDENT,
-      branch: branch,
+      branch: { $regex: `^${branch.trim()}$`, $options: 'i' },
       sem: Number(sem)
     }).select('name usn').sort({ usn: 1 });
 
