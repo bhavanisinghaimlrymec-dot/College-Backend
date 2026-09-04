@@ -55,17 +55,20 @@ exports.addUser = async (req, res) => {
   }
 };
 
-// @desc    Promote all students in a branch to next semester
+// @desc    Promote students in a branch to next semester.
+//          Pass studentIds to promote only selected students;
+//          omit it to promote the whole class.
 // @route   POST /api/admin/promote
 // @access  Private/Admin
 exports.promoteSemester = async (req, res) => {
-  const { branch, currentSem } = req.body;
+  const { branch, currentSem, studentIds } = req.body;
 
   try {
-    const result = await User.updateMany(
-      { role: ROLES.STUDENT, branch: branch, sem: currentSem },
-      { $inc: { sem: 1 } }
-    );
+    const filter = { role: ROLES.STUDENT, branch: branch, sem: currentSem };
+    if (Array.isArray(studentIds) && studentIds.length > 0) {
+      filter._id = { $in: studentIds };
+    }
+    const result = await User.updateMany(filter, { $inc: { sem: 1 } });
 
     res.json({ message: `Successfully promoted ${result.modifiedCount} students.` });
   } catch (error) {

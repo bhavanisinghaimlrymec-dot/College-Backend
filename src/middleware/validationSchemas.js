@@ -181,6 +181,7 @@ const promoteSchema = Joi.object({  branch: Joi.string().required().messages({
     'number.min': 'Semester must be between 1 and 8',
     'number.max': 'Semester must be between 1 and 8',
   }),
+  studentIds: Joi.array().items(Joi.string()).optional(),
 });
 
 // POST /api/auth/change-password
