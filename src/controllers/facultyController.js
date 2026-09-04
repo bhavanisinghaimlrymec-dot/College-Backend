@@ -93,12 +93,13 @@ exports.getAssignmentSubmissions = async (req, res) => {
 // @desc    Submit attendance for a class
 // @route   POST /api/faculty/attendance
 exports.takeAttendance = async (req, res) => {
-  const { subject, date, branch, sem, records } = req.body;
+  const { subject, date, period, branch, sem, records } = req.body;
 
   try {
     const attendance = await Attendance.create({
       subject,
       date,
+      period: period || null,
       branch,
       sem,
       records,

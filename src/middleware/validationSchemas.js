@@ -55,6 +55,7 @@ const addUserSchema = Joi.object({
 const attendanceSchema = Joi.object({
   subject: Joi.string().required(),
   date: Joi.date().required(),
+  period: Joi.string().allow(null, '').optional(),
   branch: Joi.string().required(),
   sem: Joi.number().integer().required(),
   records: Joi.array().min(1).items(

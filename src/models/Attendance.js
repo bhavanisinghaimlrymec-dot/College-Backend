@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const attendanceSchema = new mongoose.Schema({
   subject: { type: String, required: true },
   date: { type: Date, required: true },
+  period: { type: String, default: null },
   branch: { type: String, required: true },
   sem: { type: Number, required: true },
   faculty: { 

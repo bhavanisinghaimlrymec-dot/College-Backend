@@ -99,6 +99,7 @@ exports.getMyAttendance = async (req, res) => {
         $project: {
           subject: 1,
           date: 1,
+          period: 1,
           records: {
             $filter: {
               input: '$records',
